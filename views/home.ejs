@@ -1,0 +1,265 @@
+<% layout('layouts/main') %>
+<% const liveExamCount = Number(typeof publishedQuizCount !== 'undefined' ? publishedQuizCount : ((featuredQuizzes && featuredQuizzes.length) || 0)); %>
+
+<section class="landing-page">
+  <section class="landing-hero">
+    <div class="page-container landing-hero__grid">
+      <div class="landing-hero__copy animate-fade-in">
+        <span class="eyebrow">QuizMaster</span>
+        <h1>One calm workspace for exams, reviews, and results.</h1>
+        <p>
+          Teachers create and review assessments. Students enroll, submit answers, and track progress. Admins keep access clean.
+        </p>
+
+        <div class="hero-action-row">
+          <a href="/auth/register" class="btn btn-primary">
+            <i class="fas fa-user-plus"></i>
+            Create account
+          </a>
+          <a href="/auth/login" class="btn btn-outline-primary">
+            <i class="fas fa-right-to-bracket"></i>
+            Sign in
+          </a>
+        </div>
+      </div>
+
+      <div class="landing-preview animate-slide-up" aria-label="Quiz workflow preview">
+        <div class="landing-preview__top">
+          <div>
+            <span>Workspace preview</span>
+            <strong>Assessment command center</strong>
+          </div>
+          <span class="status-pill approved">Live</span>
+        </div>
+
+        <div class="landing-preview__insight">
+          <div class="landing-preview__score-ring" aria-label="82 percent workflow completion">82%</div>
+          <div>
+            <span class="landing-preview__eyebrow">Class progress</span>
+            <strong>Review-ready flow</strong>
+            <p>Enrollments, submissions, teacher feedback, and scores stay connected in one place.</p>
+          </div>
+        </div>
+
+        <div class="landing-preview__meter">
+          <div class="landing-preview__meter-labels">
+            <span>Enroll</span>
+            <span>Submit</span>
+            <span>Review</span>
+            <span>Score</span>
+          </div>
+          <div class="landing-preview__track">
+            <span></span>
+          </div>
+        </div>
+
+        <div class="landing-preview__cards">
+          <article>
+            <i class="fas fa-file-lines"></i>
+            <span>Live exams</span>
+            <strong><%= liveExamCount %></strong>
+            <small>published now</small>
+          </article>
+          <article>
+            <i class="fas fa-code"></i>
+            <span>Formats</span>
+            <strong>4</strong>
+            <small>quiz to coding</small>
+          </article>
+          <article>
+            <i class="fas fa-clipboard-check"></i>
+            <span>Review</span>
+            <strong>2</strong>
+            <small>auto + manual</small>
+          </article>
+        </div>
+
+        <div class="landing-preview__activity">
+          <div class="landing-preview__activity-top">
+            <span>What users see next</span>
+            <strong>Today</strong>
+          </div>
+          <ul>
+            <li>
+              <i class="fas fa-user-check"></i>
+              <span>
+                <strong>Students enroll</strong>
+                <small>Browse published exams by teacher, topic, and type.</small>
+              </span>
+            </li>
+            <li>
+              <i class="fas fa-pen-nib"></i>
+              <span>
+                <strong>Teachers review</strong>
+                <small>Short-answer and coding attempts move into a clear queue.</small>
+              </span>
+            </li>
+            <li>
+              <i class="fas fa-chart-simple"></i>
+              <span>
+                <strong>Scores update</strong>
+                <small>Results, progress, and leaderboards stay in sync.</small>
+              </span>
+            </li>
+          </ul>
+        </div>
+
+        <div class="landing-preview__chips" aria-label="Supported roles">
+          <span><i class="fas fa-user-graduate"></i> Student</span>
+          <span><i class="fas fa-chalkboard-teacher"></i> Teacher</span>
+          <span><i class="fas fa-user-shield"></i> Admin</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="landing-band">
+    <div class="page-container">
+      <div class="landing-section-heading">
+        <span class="eyebrow">Platform</span>
+        <h2>Everything important, grouped clearly.</h2>
+        <p>Core tools are separated by workflow so users can find the right action quickly.</p>
+      </div>
+
+      <div class="landing-feature-grid">
+        <article class="landing-feature">
+          <span class="landing-feature__icon"><i class="fas fa-pen-to-square"></i></span>
+          <h3>Build exams</h3>
+          <p>Create multiple choice, true/false, short-answer, and coding assessments.</p>
+        </article>
+        <article class="landing-feature">
+          <span class="landing-feature__icon"><i class="fas fa-user-graduate"></i></span>
+          <h3>Attempt quizzes</h3>
+          <p>Students enroll, submit answers, and view history from one workspace.</p>
+        </article>
+        <article class="landing-feature">
+          <span class="landing-feature__icon"><i class="fas fa-clipboard-check"></i></span>
+          <h3>Review manually</h3>
+          <p>Teachers grade short-answer and coding work before final scores update.</p>
+        </article>
+        <article class="landing-feature">
+          <span class="landing-feature__icon"><i class="fas fa-chart-line"></i></span>
+          <h3>Track progress</h3>
+          <p>Results, leaderboards, points, and attempt history stay connected.</p>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <section class="landing-band landing-band--soft">
+    <div class="page-container landing-role-grid">
+      <article class="landing-role">
+        <span class="landing-role__mark"><i class="fas fa-user-graduate"></i></span>
+        <div>
+          <h2>Students</h2>
+          <p>Join exams, continue attempts, see scores, and check teacher feedback.</p>
+        </div>
+        <a href="/auth/register?role=student" class="btn btn-outline-primary btn-sm">Join as student</a>
+      </article>
+
+      <article class="landing-role landing-role--featured">
+        <span class="landing-role__mark"><i class="fas fa-chalkboard-teacher"></i></span>
+        <div>
+          <h2>Teachers</h2>
+          <p>Create assessments, publish drafts, and review pending submissions.</p>
+        </div>
+        <a href="/contact" class="btn btn-primary btn-sm">Request access</a>
+      </article>
+
+      <article class="landing-role">
+        <span class="landing-role__mark"><i class="fas fa-user-shield"></i></span>
+        <div>
+          <h2>Admins</h2>
+          <p>Approve teacher access, manage users, and keep the system organized.</p>
+        </div>
+        <span class="landing-role__note">Managed internally</span>
+      </article>
+    </div>
+  </section>
+
+  <section class="landing-band">
+    <div class="page-container landing-workflow">
+      <div class="landing-section-heading landing-section-heading--left">
+        <span class="eyebrow">Workflow</span>
+        <h2>A simpler path from setup to results.</h2>
+        <p>The flow is intentionally short so new users can understand where to start.</p>
+      </div>
+
+      <div class="landing-step-list">
+        <article>
+          <span>01</span>
+          <div>
+            <h3>Create access</h3>
+            <p>Students register directly. Teachers are approved by an administrator.</p>
+          </div>
+        </article>
+        <article>
+          <span>02</span>
+          <div>
+            <h3>Publish and attempt</h3>
+            <p>Teachers publish exams and students submit answers through the app.</p>
+          </div>
+        </article>
+        <article>
+          <span>03</span>
+          <div>
+            <h3>Review and track</h3>
+            <p>Auto-graded scores update quickly, while manual work updates after review.</p>
+          </div>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <section class="landing-band landing-band--soft">
+    <div class="page-container landing-faq">
+      <div class="landing-section-heading">
+        <span class="eyebrow">FAQ</span>
+        <h2>Common questions</h2>
+      </div>
+
+      <div class="landing-faq__list">
+        <details class="landing-faq__item">
+          <summary>
+            <span>How do teachers get access?</span>
+            <i class="fas fa-chevron-down"></i>
+          </summary>
+          <p>Teachers need administrator approval before the teacher workspace becomes available.</p>
+        </details>
+        <details class="landing-faq__item">
+          <summary>
+            <span>Which exam types are supported?</span>
+            <i class="fas fa-chevron-down"></i>
+          </summary>
+          <p>The system supports quiz, true/false, short-answer, and coding test formats.</p>
+        </details>
+        <details class="landing-faq__item">
+          <summary>
+            <span>When do manual scores update?</span>
+            <i class="fas fa-chevron-down"></i>
+          </summary>
+          <p>Short-answer and coding scores update after the teacher finishes the review.</p>
+        </details>
+      </div>
+    </div>
+  </section>
+
+  <section class="landing-cta">
+    <div class="page-container landing-cta__inner">
+      <div>
+        <span class="eyebrow">Get started</span>
+        <h2>Open the workspace that matches your role.</h2>
+      </div>
+      <div class="hero-action-row">
+        <a href="/auth/register" class="btn btn-primary">
+          <i class="fas fa-user-plus"></i>
+          Create account
+        </a>
+        <a href="/auth/login" class="btn btn-outline-primary">
+          <i class="fas fa-right-to-bracket"></i>
+          Sign in
+        </a>
+      </div>
+    </div>
+  </section>
+</section>

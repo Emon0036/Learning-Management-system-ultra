@@ -1,0 +1,54 @@
+<% layout('layouts/main') %>
+<section class="page-shell">
+  <div class="page-container page-stack">
+    <div class="page-heading">
+      <div>
+        <span class="eyebrow">Demo Checkout</span>
+        <h1>Confirm Course Purchase</h1>
+        <p>This is a demo transaction. It creates a paid receipt and unlocks the course without charging real money.</p>
+      </div>
+      <a href="/courses/<%= course._id %>" class="btn btn-outline-secondary">Back to Course</a>
+    </div>
+
+    <div class="course-checkout-grid">
+      <section class="table-card table-shell">
+        <div class="panel-header">
+          <div class="panel-header__copy">
+            <span class="eyebrow">Course</span>
+            <h2><%= course.title %></h2>
+            <p><%= course.subtitle || course.description %></p>
+          </div>
+        </div>
+
+        <div class="course-package-list">
+          <span><i class="fas fa-user-tie"></i><%= course.teacher?.name || 'Teacher' %></span>
+          <span><i class="fas fa-layer-group"></i><%= course.category %></span>
+          <span><i class="fas fa-chart-line"></i><%= course.level %></span>
+          <span><i class="fas fa-language"></i><%= course.language || 'English' %></span>
+        </div>
+      </section>
+
+      <aside class="table-card table-shell">
+        <div class="panel-header">
+          <div class="panel-header__copy">
+            <span class="eyebrow">Payment</span>
+            <h2>Demo receipt</h2>
+          </div>
+        </div>
+
+        <div class="checkout-total">
+          <span>Total</span>
+          <strong><%= course.currency %> <%= Number(course.price || 0).toLocaleString() %></strong>
+          <small>No card, mobile banking, or gateway is used.</small>
+        </div>
+
+        <form action="/courses/<%= course._id %>/purchase" method="POST">
+          <button class="btn btn-success w-100" type="submit">
+            <i class="fas fa-lock-open"></i>
+            Complete Demo Payment
+          </button>
+        </form>
+      </aside>
+    </div>
+  </div>
+</section>

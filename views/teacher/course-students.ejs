@@ -1,0 +1,76 @@
+<% layout('layouts/main') %>
+<section class="page-shell">
+  <div class="page-container page-stack">
+    <div class="page-heading">
+      <div>
+        <span class="eyebrow">Teacher LMS</span>
+        <h1>Course Students</h1>
+        <p>Demo purchase and progress records for <strong><%= course.title %></strong>.</p>
+      </div>
+      <div class="toolbar">
+        <a href="/teacher/courses/<%= course._id %>/edit" class="btn btn-outline-primary">Edit Course</a>
+        <a href="/teacher/courses" class="btn btn-outline-secondary">Back</a>
+      </div>
+    </div>
+
+    <div class="summary-grid">
+      <article class="summary-card">
+        <span>Students</span>
+        <strong><%= enrollments.length %></strong>
+        <small>active or completed course learners</small>
+      </article>
+      <article class="summary-card">
+        <span>Course Price</span>
+        <strong><%= course.currency %> <%= Number(course.price || 0).toLocaleString() %></strong>
+        <small>demo checkout amount</small>
+      </article>
+      <article class="summary-card">
+        <span>Status</span>
+        <strong><%= course.status %></strong>
+        <small>catalog visibility</small>
+      </article>
+    </div>
+
+    <div class="table-card table-shell">
+      <div class="table-responsive">
+        <table class="table align-middle">
+          <thead>
+            <tr>
+              <th>Student</th>
+              <th>Progress</th>
+              <th>Status</th>
+              <th>Transaction</th>
+              <th>Purchased</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% if (!enrollments.length) { %>
+              <tr>
+                <td colspan="5" class="text-center text-muted py-4">No students have bought this course yet.</td>
+              </tr>
+            <% } %>
+            <% enrollments.forEach((enrollment) => { %>
+              <tr>
+                <td>
+                  <strong><%= enrollment.student?.name || 'Student' %></strong>
+                  <div class="small text-muted"><%= enrollment.student?.email || '' %></div>
+                </td>
+                <td><%= enrollment.progressPercentage || 0 %>%</td>
+                <td><span class="badge text-bg-<%= enrollment.status === 'completed' ? 'success' : 'primary' %>"><%= enrollment.status %></span></td>
+                <td>
+                  <% if (enrollment.purchase) { %>
+                    <code><%= enrollment.purchase.transactionId %></code>
+                    <div class="small text-muted"><%= enrollment.purchase.currency %> <%= Number(enrollment.purchase.amount || 0).toLocaleString() %></div>
+                  <% } else { %>
+                    <span class="text-muted">No receipt</span>
+                  <% } %>
+                </td>
+                <td><%= new Date(enrollment.enrolledAt || enrollment.createdAt).toLocaleDateString() %></td>
+              </tr>
+            <% }) %>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</section>

@@ -1,0 +1,153 @@
+<% layout('layouts/main') %>
+
+<section class="auth-screen auth-screen--compact">
+  <div class="auth-stage auth-stage--compact animate-fade-in">
+    <aside class="auth-showcase auth-showcase--compact auth-showcase--accent">
+      <a href="/" class="auth-brand">
+        <span class="auth-brand__mark">
+          <i class="fa-brands fa-joomla"></i>
+        </span>
+        <span class="auth-brand__copy">
+          <strong><%= appName %></strong>
+          <small>Assessment made clearer</small>
+        </span>
+      </a>
+
+      <div class="auth-showcase__intro">
+        <span class="auth-kicker">Student signup</span>
+        <h1>Create account</h1>
+        <p>Register as a student to enroll in exams and track your progress.</p>
+      </div>
+
+      <div class="auth-mini-list">
+        <span><i class="fas fa-user-check"></i> Direct signup</span>
+        <span><i class="fas fa-book-open"></i> Exam access</span>
+        <span><i class="fas fa-trophy"></i> Leaderboards</span>
+      </div>
+    </aside>
+
+    <section class="auth-form-panel auth-form-panel--compact">
+      <div class="auth-form-card">
+        <a href="/" class="auth-brand auth-brand--mobile">
+          <span class="auth-brand__mark">
+            <i class="fa-brands fa-joomla"></i>
+          </span>
+          <span class="auth-brand__copy auth-brand__copy--dark">
+            <strong><%= appName %></strong>
+            <small>Assessment made clearer</small>
+          </span>
+        </a>
+
+        <div class="auth-form-header">
+          <h2>Sign up</h2>
+          <p>Student accounts can be created immediately.</p>
+        </div>
+
+        <form action="/auth/register" method="POST" class="auth-form-stack" x-data="{ showPassword: false, showConfirmPassword: false }">
+          <label class="auth-field">
+            <span>Full name</span>
+            <input
+              id="name"
+              name="name"
+              type="text"
+              required
+              class="form-input"
+              placeholder="Your name"
+              value="<%= typeof name !== 'undefined' ? name : '' %>"
+            >
+          </label>
+
+          <label class="auth-field">
+            <span>Email address</span>
+            <input
+              id="email"
+              name="email"
+              type="email"
+              required
+              class="form-input"
+              placeholder="you@example.com"
+              value="<%= typeof email !== 'undefined' ? email : '' %>"
+            >
+          </label>
+
+          <label class="auth-field">
+            <span>Password</span>
+            <div class="auth-input-wrap">
+              <input
+                id="password"
+                name="password"
+                :type="showPassword ? 'text' : 'password'"
+                required
+                minlength="6"
+                class="form-input auth-input-pad"
+                placeholder="At least 6 characters"
+              >
+              <button
+                type="button"
+                @click="showPassword = !showPassword"
+                class="auth-input-toggle"
+                aria-label="Toggle password visibility"
+              >
+                <i :class="showPassword ? 'fas fa-eye-slash' : 'fas fa-eye'"></i>
+              </button>
+            </div>
+          </label>
+
+          <label class="auth-field">
+            <span>Confirm password</span>
+            <div class="auth-input-wrap">
+              <input
+                id="confirmPassword"
+                name="confirmPassword"
+                :type="showConfirmPassword ? 'text' : 'password'"
+                required
+                minlength="6"
+                class="form-input auth-input-pad"
+                placeholder="Repeat password"
+              >
+              <button
+                type="button"
+                @click="showConfirmPassword = !showConfirmPassword"
+                class="auth-input-toggle"
+                aria-label="Toggle password visibility"
+              >
+                <i :class="showConfirmPassword ? 'fas fa-eye-slash' : 'fas fa-eye'"></i>
+              </button>
+            </div>
+          </label>
+
+          <label for="terms" class="auth-check auth-check--start">
+            <input
+              id="terms"
+              name="terms"
+              type="checkbox"
+              required
+              class="form-check-input"
+            >
+            <span>
+              I agree to the
+              <a href="/terms" class="auth-subtle-link">Terms</a>
+              and
+              <a href="/privacy" class="auth-subtle-link">Privacy Policy</a>.
+            </span>
+          </label>
+
+          <button type="submit" class="btn btn-primary auth-submit">
+            <i class="fas fa-user-plus"></i>
+            <span>Create account</span>
+          </button>
+        </form>
+
+        <p class="auth-alt-copy">
+          Already registered?
+          <a href="/auth/login" class="auth-subtle-link">Sign in</a>
+        </p>
+
+        <div class="auth-helper-card">
+          <h3>Teacher access</h3>
+          <p>Teacher accounts are approved by an administrator before the teacher workspace opens.</p>
+        </div>
+      </div>
+    </section>
+  </div>
+</section>

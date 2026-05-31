@@ -1,0 +1,122 @@
+<% layout('layouts/main') %>
+
+<section class="auth-screen auth-screen--compact">
+  <div class="auth-stage auth-stage--compact animate-fade-in">
+    <aside class="auth-showcase auth-showcase--compact">
+      <a href="/" class="auth-brand">
+        <span class="auth-brand__mark">
+          <i class="fa-brands fa-joomla"></i>
+        </span>
+        <span class="auth-brand__copy">
+          <strong><%= appName %></strong>
+          <small>Assessment made clearer</small>
+        </span>
+      </a>
+
+      <div class="auth-showcase__intro">
+        <span class="auth-kicker">Welcome back</span>
+        <h1>Sign in</h1>
+        <p>Continue to your student, teacher, or admin workspace.</p>
+      </div>
+
+      <div class="auth-mini-list">
+        <span><i class="fas fa-book-open"></i> Exams</span>
+        <span><i class="fas fa-clipboard-check"></i> Reviews</span>
+        <span><i class="fas fa-chart-line"></i> Progress</span>
+      </div>
+    </aside>
+
+    <section class="auth-form-panel auth-form-panel--compact">
+      <div class="auth-form-card">
+        <a href="/" class="auth-brand auth-brand--mobile">
+          <span class="auth-brand__mark">
+            <i class="fa-brands fa-joomla"></i>
+          </span>
+          <span class="auth-brand__copy auth-brand__copy--dark">
+            <strong><%= appName %></strong>
+            <small>Assessment made clearer</small>
+          </span>
+        </a>
+
+        <div class="auth-form-header">
+          <h2>Log in</h2>
+          <p>Use your account email and password.</p>
+        </div>
+
+        <form action="/auth/login" method="POST" class="auth-form-stack" x-data="{ showPassword: false }">
+          <% if (currentTabId) { %>
+            <input type="hidden" name="tab" value="<%= currentTabId %>">
+          <% } %>
+
+          <label class="auth-field">
+            <span>Email address</span>
+            <input
+              id="email"
+              name="email"
+              type="email"
+              required
+              class="form-input"
+              placeholder="you@example.com"
+              value="<%= typeof email !== 'undefined' ? email : '' %>"
+            >
+          </label>
+
+          <label class="auth-field">
+            <span>Password</span>
+            <div class="auth-input-wrap">
+              <input
+                id="password"
+                name="password"
+                :type="showPassword ? 'text' : 'password'"
+                required
+                class="form-input auth-input-pad"
+                placeholder="Enter password"
+              >
+              <button
+                type="button"
+                @click="showPassword = !showPassword"
+                class="auth-input-toggle"
+                aria-label="Toggle password visibility"
+              >
+                <i :class="showPassword ? 'fas fa-eye-slash' : 'fas fa-eye'"></i>
+              </button>
+            </div>
+          </label>
+
+          <div class="auth-inline-row">
+            <label for="remember" class="auth-check">
+              <input
+                id="remember"
+                name="remember"
+                type="checkbox"
+                class="form-check-input"
+              >
+              <span>Remember me</span>
+            </label>
+
+            <a href="/auth/forgot-password" class="auth-subtle-link">Forgot password?</a>
+          </div>
+
+          <button type="submit" class="btn btn-primary auth-submit">
+            <i class="fas fa-right-to-bracket"></i>
+            <span>Sign in</span>
+          </button>
+        </form>
+
+        <p class="auth-alt-copy">
+          New here?
+          <a href="/auth/register" class="auth-subtle-link">Create an account</a>
+        </p>
+
+        <% if (process.env.NODE_ENV === 'development') { %>
+          <details class="auth-helper-card auth-helper-card--details">
+            <summary>Demo credentials</summary>
+            <p><strong>Admin:</strong> admin@example.com / admin123</p>
+            <p><strong>Teacher:</strong> teacher@example.com / teacher123</p>
+            <p><strong>Student:</strong> student@example.com / student123</p>
+          </details>
+        <% } %>
+      </div>
+    </section>
+  </div>
+</section>

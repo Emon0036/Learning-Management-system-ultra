@@ -1,0 +1,467 @@
+<% layout('layouts/main') %>
+<%
+  const isExistingCourse = Boolean(course && course._id);
+  const actionWithTab = (url) => {
+    if (!currentTabId) return url;
+    return `${url}${url.includes('?') ? '&' : '?'}tab=${encodeURIComponent(currentTabId)}`;
+  };
+  const courseLessons = lessons || [];
+  const courseMaterials = materials || [];
+  const courseSessions = sessions || [];
+  const courseAssignments = assignments || [];
+  const linkedQuizCount = courseLessons.filter((lesson) => lesson.quiz).length;
+  const courseLevel = course.level || 'Beginner';
+  const formatDurationFromSeconds = (value) => {
+    const totalSeconds = Math.max(0, Math.round(Number(value || 0)));
+    const hours = Math.floor(totalSeconds / 3600);
+    const minutes = Math.floor((totalSeconds % 3600) / 60);
+    const seconds = totalSeconds % 60;
+    return `${hours} hr ${minutes} min ${seconds} sec`;
+  };
+  const formatDurationFromMinutes = (value) => formatDurationFromSeconds(Number(value || 0) * 60);
+  const materialLabels = {
+    note: 'Note',
+    file: 'File',
+    'recorded-class': 'Recorded class',
+    'external-link': 'External link',
+    'community-link': 'Community link',
+    'youtube-class': 'YouTube class'
+  };
+  const materialTypeLabel = (type) => materialLabels[type] || String(type || 'Material').replace(/-/g, ' ');
+  const materialIcon = (type) => {
+    if (type === 'youtube-class' || type === 'recorded-class') return 'fa-circle-play';
+    if (type === 'community-link') return 'fa-users';
+    if (type === 'file') return 'fa-file-arrow-down';
+    if (type === 'note') return 'fa-note-sticky';
+    return 'fa-link';
+  };
+  const assignmentsByLesson = new Map();
+  courseAssignments.forEach((assignment) => {
+    const key = assignment.lesson ? String(assignment.lesson._id || assignment.lesson) : 'course';
+    if (!assignmentsByLesson.has(key)) assignmentsByLesson.set(key, []);
+    assignmentsByLesson.get(key).push(assignment);
+  });
+  const courseLevelMaterials = materialsByLesson.get('course') || [];
+  const courseLevelAssignments = assignmentsByLesson.get('course') || [];
+%>
+
+<section class="page-shell course-builder-page course-builder-simple-page">
+  <div class="page-container page-stack">
+    <div class="course-builder-appbar">
+      <div class="course-builder-brand">
+        <span class="brand-mark"><i class="fas fa-graduation-cap"></i></span>
+        <strong>Course Builder</strong>
+      </div>
+
+      <nav class="course-builder-steps" aria-label="Course builder steps">
+        <span class="course-builder-step <%= !isExistingCourse ? 'is-active' : '' %>"><b>1</b> Basics</span>
+        <span class="course-builder-step <%= isExistingCourse ? 'is-active' : '' %>"><b>2</b> Curriculum</span>
+        <span class="course-builder-step"><b>3</b> Additional</span>
+      </nav>
+
+      <div class="course-builder-actions">
+        <% if (isExistingCourse && course.status === 'published') { %>
+          <a href="/courses/<%= course._id %>" class="btn btn-outline-secondary" target="_blank" rel="noopener">
+            Preview <i class="fas fa-arrow-up-right-from-square"></i>
+          </a>
+        <% } %>
+        <% if (isExistingCourse) { %>
+          <form action="<%= actionWithTab(`/teacher/courses/${course._id}/publish?_method=PATCH`) %>" method="POST" class="inline-form">
+            <button class="btn <%= course.status === 'published' ? 'btn-outline-warning' : 'btn-primary' %>" type="submit">
+              <i class="fas <%= course.status === 'published' ? 'fa-eye-slash' : 'fa-rocket' %>"></i>
+              <%= course.status === 'published' ? 'Unpublish' : 'Publish' %>
+            </button>
+          </form>
+        <% } %>
+      </div>
+    </div>
+
+    <details class="simple-builder-card simple-basics-card" <%= !isExistingCourse ? 'open' : '' %>>
+      <summary>
+        <span class="builder-step-dot">1</span>
+        <div>
+          <h2>Basics</h2>
+          <p><%= isExistingCourse ? 'Course title, price, category, and catalog details.' : 'Create the course first, then the curriculum builder opens.' %></p>
+        </div>
+      </summary>
+
+      <form action="<%= actionWithTab(action) %>" method="POST" class="simple-basics-form">
+        <div class="builder-field-grid builder-field-grid--split">
+          <div class="form-field">
+            <label class="form-label" for="courseTitle">Course title</label>
+            <input id="courseTitle" class="form-control" name="title" value="<%= course.title || '' %>" placeholder="Example: C Programming Batch 01" required>
+          </div>
+
+          <div class="form-field">
+            <label class="form-label" for="courseSubtitle">Short subtitle</label>
+            <input id="courseSubtitle" class="form-control" name="subtitle" value="<%= course.subtitle || '' %>" placeholder="Short promise for students">
+          </div>
+        </div>
+
+        <div class="form-field">
+          <label class="form-label" for="courseDescription">Description</label>
+          <textarea id="courseDescription" class="form-control" name="description" rows="4" placeholder="Explain what students will learn" required><%= course.description || '' %></textarea>
+        </div>
+
+        <div class="builder-field-grid builder-field-grid--split">
+          <div class="form-field">
+            <label class="form-label" for="courseCategory">Category</label>
+            <input id="courseCategory" class="form-control" name="category" value="<%= course.category || 'General' %>" required>
+          </div>
+          <div class="form-field">
+            <label class="form-label" for="courseLevel">Level</label>
+            <select id="courseLevel" class="form-select" name="level">
+              <% ['Beginner', 'Intermediate', 'Advanced'].forEach((level) => { %>
+                <option value="<%= level %>" <%= courseLevel === level ? 'selected' : '' %>><%= level %></option>
+              <% }) %>
+            </select>
+          </div>
+        </div>
+
+        <div class="builder-field-grid builder-field-grid--split">
+          <div class="form-field">
+            <label class="form-label" for="coursePrice">Demo price</label>
+            <input id="coursePrice" class="form-control" type="number" min="0" step="1" name="price" value="<%= course.price || 0 %>">
+          </div>
+          <div class="form-field">
+            <label class="form-label" for="courseCurrency">Currency</label>
+            <input id="courseCurrency" class="form-control" name="currency" maxlength="3" value="<%= course.currency || 'BDT' %>">
+          </div>
+        </div>
+
+        <div class="builder-field-grid builder-field-grid--split">
+          <div class="form-field">
+            <label class="form-label" for="courseLanguage">Language</label>
+            <input id="courseLanguage" class="form-control" name="language" value="<%= course.language || 'English' %>">
+          </div>
+          <div class="form-field">
+            <label class="form-label" for="courseDurationHours">Duration hours</label>
+            <input id="courseDurationHours" class="form-control" type="number" min="0" step="0.5" name="durationHours" value="<%= course.durationHours || 0 %>">
+          </div>
+        </div>
+
+        <div class="form-field">
+          <label class="form-label" for="courseThumbnailUrl">Thumbnail URL</label>
+          <input id="courseThumbnailUrl" class="form-control" name="thumbnailUrl" value="<%= course.thumbnailUrl || '' %>" placeholder="https://example.com/course-cover.jpg">
+        </div>
+
+        <div class="builder-field-grid builder-field-grid--split">
+          <div class="form-field">
+            <label class="form-label" for="courseOutcomes">Learning outcomes</label>
+            <textarea id="courseOutcomes" class="form-control" name="outcomes" rows="3" placeholder="One outcome per line"><%= (course.outcomes || []).join('\n') %></textarea>
+          </div>
+          <div class="form-field">
+            <label class="form-label" for="courseRequirements">Requirements</label>
+            <textarea id="courseRequirements" class="form-control" name="requirements" rows="3" placeholder="One requirement per line"><%= (course.requirements || []).join('\n') %></textarea>
+          </div>
+        </div>
+
+        <button class="btn btn-primary" type="submit">
+          <i class="fas fa-save"></i>
+          <%= isExistingCourse ? 'Update Basics' : 'Create Course' %>
+        </button>
+      </form>
+    </details>
+
+    <% if (!isExistingCourse) { %>
+      <section class="empty-state">
+        <h3>Curriculum unlocks after saving</h3>
+        <p>Create the course basics first, then add topics, lecture videos, quizzes, files, live links, and assignments.</p>
+      </section>
+    <% } else { %>
+      <section class="simple-builder-card curriculum-board">
+        <div class="curriculum-board__top">
+          <div class="curriculum-title">
+            <a href="/teacher/courses" class="icon-button" aria-label="Back to courses"><i class="fas fa-arrow-left"></i></a>
+            <div>
+              <span class="eyebrow">Step 2</span>
+              <h1>Curriculum</h1>
+            </div>
+          </div>
+          <button class="btn btn-outline-secondary" type="button" data-expand-curriculum>Expand All</button>
+        </div>
+
+        <div class="curriculum-summary-strip">
+          <span><strong><%= courseLessons.length %></strong> topics</span>
+          <span><strong><%= courseMaterials.length %></strong> lessons/files/links</span>
+          <span><strong><%= linkedQuizCount %></strong> quizzes</span>
+          <span><strong><%= courseAssignments.length %></strong> assignments</span>
+        </div>
+
+        <div class="curriculum-topic-list">
+          <% if (!courseLessons.length) { %>
+            <div class="empty-state">No topics yet. Add a topic like "Whatsapp Community", "Class (Theory + Lab)", or "Lab class".</div>
+          <% } %>
+
+          <% courseLessons.forEach((lesson, index) => { %>
+            <% const lessonMaterials = materialsByLesson.get(String(lesson._id)) || []; %>
+            <% const lessonAssignments = assignmentsByLesson.get(String(lesson._id)) || []; %>
+            <details class="curriculum-topic" id="topic-<%= lesson._id %>" <%= index === 0 ? 'open' : '' %>>
+              <summary class="curriculum-topic__summary">
+                <i class="fas fa-grip-vertical"></i>
+                <span><%= lesson.title %></span>
+                <small>
+                  <%= lessonMaterials.length %> item<%= lessonMaterials.length === 1 ? '' : 's' %>
+                  <% if (lesson.quiz) { %> - quiz<% } %>
+                  <% if (lessonAssignments.length) { %> - <%= lessonAssignments.length %> assignment<%= lessonAssignments.length === 1 ? '' : 's' %><% } %>
+                </small>
+              </summary>
+
+              <div class="curriculum-topic__body">
+                <% if (lesson.description) { %>
+                  <p class="curriculum-topic__description"><%= lesson.description %></p>
+                <% } %>
+
+                <div class="curriculum-items">
+                  <% if (lesson.quiz) { %>
+                    <article class="curriculum-item curriculum-item--quiz">
+                      <i class="fas fa-circle-question"></i>
+                      <div>
+                        <strong><%= lesson.quiz.title %></strong>
+                        <small><%= lesson.quiz.status %> - <%= lesson.quiz.totalMarks || 0 %> marks - <%= formatDurationFromMinutes(lesson.quiz.duration) %></small>
+                      </div>
+                    </article>
+                  <% } %>
+
+                  <% lessonMaterials.forEach((material) => { %>
+                    <article class="curriculum-item">
+                      <i class="fas <%= materialIcon(material.type) %>"></i>
+                      <div>
+                        <strong><%= material.title %></strong>
+                        <small><%= materialTypeLabel(material.type) %><% if (material.fileName) { %> - <%= material.fileName %><% } %></small>
+                      </div>
+                      <div class="curriculum-item__actions">
+                        <% if (material.resourceUrl) { %>
+                          <a class="icon-button" href="<%= material.resourceUrl %>" target="_blank" rel="noopener" aria-label="Open material"><i class="fas fa-arrow-up-right-from-square"></i></a>
+                        <% } %>
+                        <form action="<%= actionWithTab(`/teacher/courses/${course._id}/materials/${material._id}?_method=DELETE`) %>" method="POST">
+                          <button class="icon-button icon-button--danger" type="submit" aria-label="Delete material"><i class="fas fa-trash"></i></button>
+                        </form>
+                      </div>
+                    </article>
+                  <% }) %>
+
+                  <% lessonAssignments.forEach((assignment) => { %>
+                    <% const assignmentSubmissions = assignment.submissions || []; %>
+                    <article class="curriculum-item curriculum-item--assignment" id="assignment-<%= assignment._id %>">
+                      <i class="fas fa-file-pen"></i>
+                      <div>
+                        <strong><%= assignment.title %></strong>
+                        <small>Due <%= new Date(assignment.dueAt).toLocaleString() %><% if (assignment.maxMarks) { %> - <%= assignment.maxMarks %> marks<% } %></small>
+                        <% if (assignmentSubmissions.length) { %>
+                          <details class="curriculum-submissions">
+                            <summary><%= assignmentSubmissions.length %> submission<%= assignmentSubmissions.length === 1 ? '' : 's' %></summary>
+                            <% assignmentSubmissions.forEach((submission) => { %>
+                              <article class="course-assignment-submission">
+                                <div>
+                                  <strong><%= submission.student?.name || 'Student' %></strong>
+                                  <small><%= submission.student?.email || '' %> - <%= submission.status %></small>
+                                  <a href="<%= submission.answerFileUrl %>" target="_blank" rel="noopener">Answer PDF</a>
+                                </div>
+                                <form class="course-assignment-review" action="<%= actionWithTab(`/teacher/courses/${course._id}/assignments/${assignment._id}/submissions/${submission._id}/review?_method=PATCH`) %>" method="POST">
+                                  <input class="form-control form-control-sm" type="number" min="0" <% if (assignment.maxMarks) { %>max="<%= assignment.maxMarks %>"<% } %> step="1" name="marksAwarded" value="<%= submission.marksAwarded || 0 %>" aria-label="Marks awarded">
+                                  <input class="form-control form-control-sm" name="teacherComment" value="<%= submission.teacherComment || '' %>" placeholder="Feedback">
+                                  <button class="btn btn-sm btn-outline-primary">Review</button>
+                                </form>
+                              </article>
+                            <% }) %>
+                          </details>
+                        <% } %>
+                      </div>
+                      <div class="curriculum-item__actions">
+                        <a class="icon-button" href="<%= assignment.questionFileUrl %>" target="_blank" rel="noopener" aria-label="Open question PDF"><i class="fas fa-arrow-up-right-from-square"></i></a>
+                        <form action="<%= actionWithTab(`/teacher/courses/${course._id}/assignments/${assignment._id}?_method=DELETE`) %>" method="POST" onsubmit="return confirm('Delete this assignment and all answer PDFs?')">
+                          <button class="icon-button icon-button--danger" type="submit" aria-label="Delete assignment"><i class="fas fa-trash"></i></button>
+                        </form>
+                      </div>
+                    </article>
+                  <% }) %>
+
+                  <% if (!lesson.quiz && !lessonMaterials.length && !lessonAssignments.length) { %>
+                    <article class="curriculum-item curriculum-item--empty">
+                      <i class="fas fa-book"></i>
+                      <div>
+                        <strong>Click a button below</strong>
+                        <small>Add a recorded lecture, file, quiz, or assignment to this topic.</small>
+                      </div>
+                    </article>
+                  <% } %>
+                </div>
+
+                <div class="topic-add-grid">
+                  <details class="topic-add-card" open>
+                    <summary><i class="fas fa-plus"></i> Lesson / Video</summary>
+                    <form action="<%= actionWithTab(`/teacher/courses/${course._id}/materials`) %>" method="POST" enctype="multipart/form-data" class="topic-mini-form">
+                      <input type="hidden" name="lesson" value="<%= lesson._id %>">
+                      <input type="hidden" name="position" value="<%= courseMaterials.length + 1 %>">
+
+                      <div class="builder-field-grid builder-field-grid--split">
+                        <input class="form-control" name="title" placeholder="Class 01 recorded lecture" required>
+                        <select class="form-select" name="type">
+                          <option value="youtube-class">YouTube recorded lecture</option>
+                          <option value="recorded-class">Other recorded class link</option>
+                          <option value="community-link">Community link</option>
+                          <option value="file">Upload PDF/file</option>
+                          <option value="note">Text note</option>
+                          <option value="external-link">External link</option>
+                        </select>
+                      </div>
+
+                      <input class="form-control" name="resourceUrl" placeholder="Paste YouTube, WhatsApp, Drive, Zoom recording, or any link">
+                      <textarea class="form-control" name="content" rows="2" placeholder="Short note or description"></textarea>
+                      <input class="form-control" type="file" name="resourceFile">
+                      <button class="btn btn-primary btn-sm" type="submit"><i class="fas fa-plus"></i>Add</button>
+                    </form>
+                  </details>
+
+                  <details class="topic-add-card">
+                    <summary><i class="fas fa-plus"></i> Quiz</summary>
+                    <form action="<%= actionWithTab(`/teacher/courses/${course._id}/lessons/${lesson._id}/quiz?_method=PATCH`) %>" method="POST" class="topic-mini-form">
+                      <select class="form-select" name="quiz">
+                        <option value="">No quiz</option>
+                        <% (quizzes || []).forEach((quiz) => { %>
+                          <option value="<%= quiz._id %>" <%= lesson.quiz && String(lesson.quiz._id) === String(quiz._id) ? 'selected' : '' %>><%= quiz.title %> (<%= quiz.status %>)</option>
+                        <% }) %>
+                      </select>
+                      <div class="topic-button-row">
+                        <button class="btn btn-primary btn-sm" type="submit">Attach Quiz</button>
+                        <a class="btn btn-outline-primary btn-sm" href="/teacher/quizzes/new"><i class="fas fa-circle-question"></i>Create Quiz</a>
+                      </div>
+                    </form>
+                  </details>
+
+                  <details class="topic-add-card">
+                    <summary><i class="fas fa-plus"></i> Assignment</summary>
+                    <form action="<%= actionWithTab(`/teacher/courses/${course._id}/assignments`) %>" method="POST" enctype="multipart/form-data" class="topic-mini-form">
+                      <input type="hidden" name="lesson" value="<%= lesson._id %>">
+                      <input type="hidden" name="position" value="<%= courseAssignments.length + 1 %>">
+                      <input class="form-control" name="title" placeholder="Assignment title" required>
+                      <div class="builder-field-grid builder-field-grid--split">
+                        <input class="form-control" type="datetime-local" name="dueAt" required>
+                        <input class="form-control" type="number" min="0" step="1" name="maxMarks" value="10" placeholder="Marks">
+                      </div>
+                      <textarea class="form-control" name="instructions" rows="2" placeholder="Instructions"></textarea>
+                      <input class="form-control" type="file" name="questionFile" accept="application/pdf,.pdf" required>
+                      <button class="btn btn-primary btn-sm" type="submit"><i class="fas fa-file-circle-plus"></i>Add Assignment</button>
+                    </form>
+                  </details>
+                </div>
+
+                <form action="<%= actionWithTab(`/teacher/courses/${course._id}/lessons/${lesson._id}?_method=DELETE`) %>" method="POST" onsubmit="return confirm('Delete this topic and its content?')">
+                  <button class="btn btn-sm btn-outline-danger" type="submit"><i class="fas fa-trash"></i>Delete Topic</button>
+                </form>
+              </div>
+            </details>
+          <% }) %>
+        </div>
+
+        <form action="<%= actionWithTab(`/teacher/courses/${course._id}/lessons`) %>" method="POST" class="add-topic-form add-topic-form--expanded">
+          <input type="hidden" name="position" value="<%= courseLessons.length + 1 %>">
+          <div class="builder-field-grid builder-field-grid--split">
+            <input class="form-control" name="title" placeholder="New topic title, e.g. HTML lecture 1" required>
+            <input class="form-control" type="number" min="0" name="durationMinutes" placeholder="Duration minutes">
+          </div>
+          <input class="form-control" name="videoUrl" placeholder="Optional class video link, e.g. YouTube or Zoom recording URL">
+          <textarea class="form-control" name="description" rows="2" placeholder="Short topic description"></textarea>
+          <button class="btn btn-primary" type="submit"><i class="fas fa-square-plus"></i>Add Topic</button>
+        </form>
+      </section>
+
+      <section class="simple-builder-card additional-board">
+        <div class="curriculum-board__top">
+          <div>
+            <span class="eyebrow">Step 3</span>
+            <h2>Additional</h2>
+            <p>Online class links and course-wide resources.</p>
+          </div>
+        </div>
+
+        <div class="additional-grid">
+          <details class="topic-add-card" open>
+            <summary><i class="fas fa-video"></i> Announce online class</summary>
+            <form action="<%= actionWithTab(`/teacher/courses/${course._id}/sessions`) %>" method="POST" class="topic-mini-form">
+              <input class="form-control" name="title" placeholder="Online class title" required>
+              <div class="builder-field-grid builder-field-grid--split">
+                <input class="form-control" type="datetime-local" name="scheduledAt" required>
+                <input class="form-control" type="number" min="1" name="durationMinutes" value="60" placeholder="Minutes">
+              </div>
+              <input class="form-control" name="meetingUrl" placeholder="Zoom or Google Meet link" required>
+              <input class="form-control" name="recordingUrl" placeholder="Optional recording link">
+              <textarea class="form-control" name="description" rows="2" placeholder="Short class note"></textarea>
+              <button class="btn btn-primary btn-sm" type="submit"><i class="fas fa-bullhorn"></i>Announce Class</button>
+            </form>
+          </details>
+
+          <details class="topic-add-card">
+            <summary><i class="fas fa-paperclip"></i> Course-wide resource</summary>
+            <form action="<%= actionWithTab(`/teacher/courses/${course._id}/materials`) %>" method="POST" enctype="multipart/form-data" class="topic-mini-form">
+              <input type="hidden" name="position" value="<%= courseMaterials.length + 1 %>">
+              <input class="form-control" name="title" placeholder="Whatsapp Community / Syllabus / Extra link" required>
+              <select class="form-select" name="type">
+                <option value="community-link">Community link</option>
+                <option value="youtube-class">YouTube recorded lecture</option>
+                <option value="file">Upload PDF/file</option>
+                <option value="note">Text note</option>
+                <option value="external-link">External link</option>
+              </select>
+              <input class="form-control" name="resourceUrl" placeholder="Paste link">
+              <textarea class="form-control" name="content" rows="2" placeholder="Short note"></textarea>
+              <input class="form-control" type="file" name="resourceFile">
+              <button class="btn btn-primary btn-sm" type="submit"><i class="fas fa-plus"></i>Add Resource</button>
+            </form>
+          </details>
+        </div>
+
+        <% if (courseLevelMaterials.length || courseLevelAssignments.length || courseSessions.length) { %>
+          <div class="curriculum-items curriculum-items--standalone">
+            <% courseLevelMaterials.forEach((material) => { %>
+              <article class="curriculum-item">
+                <i class="fas <%= materialIcon(material.type) %>"></i>
+                <div>
+                  <strong><%= material.title %></strong>
+                  <small><%= materialTypeLabel(material.type) %><% if (material.fileName) { %> - <%= material.fileName %><% } %></small>
+                </div>
+                <div class="curriculum-item__actions">
+                  <% if (material.resourceUrl) { %>
+                    <a class="icon-button" href="<%= material.resourceUrl %>" target="_blank" rel="noopener" aria-label="Open resource"><i class="fas fa-arrow-up-right-from-square"></i></a>
+                  <% } %>
+                  <form action="<%= actionWithTab(`/teacher/courses/${course._id}/materials/${material._id}?_method=DELETE`) %>" method="POST">
+                    <button class="icon-button icon-button--danger" type="submit" aria-label="Delete resource"><i class="fas fa-trash"></i></button>
+                  </form>
+                </div>
+              </article>
+            <% }) %>
+
+            <% courseSessions.forEach((session) => { %>
+              <article class="curriculum-item">
+                <i class="fas fa-video"></i>
+                <div>
+                  <strong><%= session.title %></strong>
+                  <small><%= new Date(session.scheduledAt).toLocaleString() %> - <%= formatDurationFromMinutes(session.durationMinutes) %> - <%= session.status %></small>
+                  <div class="course-session-links">
+                    <a href="<%= session.meetingUrl %>" target="_blank" rel="noopener">Meeting link</a>
+                    <% if (session.recordingUrl) { %><a href="<%= session.recordingUrl %>" target="_blank" rel="noopener">Recording</a><% } %>
+                  </div>
+                </div>
+                <div class="course-session-actions">
+                  <form action="<%= actionWithTab(`/teacher/courses/${course._id}/sessions/${session._id}?_method=PATCH`) %>" method="POST">
+                    <select class="form-select form-select-sm" name="status">
+                      <% ['scheduled', 'completed', 'cancelled'].forEach((status) => { %>
+                        <option value="<%= status %>" <%= session.status === status ? 'selected' : '' %>><%= status %></option>
+                      <% }) %>
+                    </select>
+                    <input class="form-control form-control-sm" name="recordingUrl" value="<%= session.recordingUrl || '' %>" placeholder="Recording URL">
+                    <button class="btn btn-sm btn-outline-primary">Save</button>
+                  </form>
+                  <form action="<%= actionWithTab(`/teacher/courses/${course._id}/sessions/${session._id}?_method=DELETE`) %>" method="POST">
+                    <button class="icon-button icon-button--danger" type="submit" aria-label="Delete session"><i class="fas fa-trash"></i></button>
+                  </form>
+                </div>
+              </article>
+            <% }) %>
+          </div>
+        <% } %>
+      </section>
+    <% } %>
+  </div>
+</section>

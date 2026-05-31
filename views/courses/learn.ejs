@@ -1,0 +1,292 @@
+<% layout('layouts/main') %>
+<%
+  const courseAssignments = assignments || [];
+  const assignmentSubmissions = assignmentSubmissionByAssignment || new Map();
+  const videoMaterialTypes = new Set(['youtube-class', 'recorded-class']);
+  const courseLessons = lessons || [];
+  const currentLesson = courseLessons.find((lesson) => !completedLessonIds.has(String(lesson._id))) || courseLessons[0] || null;
+  const formatDurationFromSeconds = (value) => {
+    const totalSeconds = Math.max(0, Math.round(Number(value || 0)));
+    const hours = Math.floor(totalSeconds / 3600);
+    const minutes = Math.floor((totalSeconds % 3600) / 60);
+    const seconds = totalSeconds % 60;
+    return `${hours} hr ${minutes} min ${seconds} sec`;
+  };
+  const formatDurationFromMinutes = (value) => formatDurationFromSeconds(Number(value || 0) * 60);
+%>
+<section class="page-shell course-classroom-page">
+  <div class="page-container page-stack">
+    <div class="page-heading course-study-heading">
+      <div>
+        <span class="eyebrow">Course Classroom</span>
+        <h1><%= course.title %></h1>
+        <p>Study inside a focused classroom with videos, notes, quizzes, and progress in one calm place.</p>
+      </div>
+      <div class="toolbar">
+        <a href="/courses/my-learning" class="btn btn-outline-secondary">My Learning</a>
+        <a href="/enrollments/my-quizzes" class="btn btn-outline-primary">My Exams</a>
+      </div>
+    </div>
+
+    <div class="summary-grid course-study-stats">
+      <article class="summary-card">
+        <span>Progress</span>
+        <strong><%= enrollment.progressPercentage || 0 %>%</strong>
+        <small>lesson completion</small>
+      </article>
+      <article class="summary-card">
+        <span>Sections</span>
+        <strong><%= lessons.length %></strong>
+        <small>course sections</small>
+      </article>
+      <article class="summary-card">
+        <span>Materials</span>
+        <strong><%= materials.length %></strong>
+        <small>notes, files, and recordings</small>
+      </article>
+      <article class="summary-card">
+        <span>Sessions</span>
+        <strong><%= sessions.length %></strong>
+        <small>online classes</small>
+      </article>
+      <article class="summary-card">
+        <span>Assignments</span>
+        <strong><%= courseAssignments.length %></strong>
+        <small>PDF submissions</small>
+      </article>
+    </div>
+
+    <% const courseLevelMaterials = materialsByLesson.get('course') || []; %>
+    <% if (!courseLessons.length) { %>
+      <div class="empty-state">This course does not have sections yet.</div>
+    <% } else { %>
+      <div class="course-study-layout">
+        <main class="course-study-main" aria-label="Course lessons">
+          <% if (courseLevelMaterials.length) { %>
+            <section class="course-study-lesson course-study-resources">
+              <div class="course-study-lesson__top">
+                <div>
+                  <span class="course-study-kicker">Course resources</span>
+                  <h2>Helpful files and links</h2>
+                  <p>Extra material for the whole course stays here, away from the lesson video.</p>
+                </div>
+              </div>
+              <div class="course-study-support-list">
+                <% courseLevelMaterials.forEach((material) => { %>
+                  <%- include('../partials/course-material', { material, hideVideoExternalLink: true }) %>
+                <% }) %>
+              </div>
+            </section>
+          <% } %>
+
+          <% courseLessons.forEach((lesson) => { %>
+            <%
+              const isComplete = completedLessonIds.has(String(lesson._id));
+              const lessonMaterials = materialsByLesson.get(String(lesson._id)) || [];
+              const videoMaterials = lessonMaterials.filter((material) => videoMaterialTypes.has(material.type));
+              const supportMaterials = lessonMaterials.filter((material) => !videoMaterialTypes.has(material.type));
+              const isCurrentLesson = currentLesson && String(currentLesson._id) === String(lesson._id);
+            %>
+            <article class="course-study-lesson <%= isCurrentLesson ? 'is-current' : '' %>" id="lesson-<%= lesson._id %>">
+              <div class="course-study-lesson__top">
+                <div>
+                  <span class="status-pill <%= isComplete ? 'approved' : 'pending' %>"><%= isComplete ? 'Complete' : 'In progress' %></span>
+                  <% if (isCurrentLesson) { %><span class="course-study-kicker">Continue here</span><% } %>
+                  <h2><%= lesson.position %>. <%= lesson.title %></h2>
+                  <p><%= lesson.description || 'No description added.' %></p>
+                  <small><i class="fas fa-clock"></i> <%= formatDurationFromMinutes(lesson.durationMinutes) %></small>
+                </div>
+                <form action="/courses/<%= course._id %>/lessons/<%= lesson._id %>/complete" method="POST">
+                  <button class="btn btn-sm <%= isComplete ? 'btn-outline-secondary' : 'btn-success' %>" type="submit">
+                    <%= isComplete ? 'Mark Incomplete' : 'Mark Complete' %>
+                  </button>
+                </form>
+              </div>
+
+              <% if (videoMaterials.length) { %>
+                <div class="course-video-stack" aria-label="Class videos">
+                  <% videoMaterials.forEach((material) => { %>
+                    <%- include('../partials/course-material', { material, hideVideoExternalLink: true }) %>
+                  <% }) %>
+                </div>
+              <% } else { %>
+                <div class="course-material-empty">
+                  <i class="fas fa-video-slash"></i>
+                  <div>
+                    <strong>No class video has been added yet</strong>
+                    <span>Ask the teacher to add a YouTube or recorded-class material to this section.</span>
+                  </div>
+                </div>
+              <% } %>
+
+              <% if (supportMaterials.length || lesson.quiz) { %>
+                <div class="course-study-support">
+                  <% if (supportMaterials.length) { %>
+                    <div class="course-study-support-list">
+                      <% supportMaterials.forEach((material) => { %>
+                        <%- include('../partials/course-material', { material, hideVideoExternalLink: true }) %>
+                      <% }) %>
+                    </div>
+                  <% } %>
+
+                  <% if (lesson.quiz) { %>
+                    <div class="course-linked-quiz">
+                      <i class="fas fa-circle-question"></i>
+                      <div>
+                        <strong><%= lesson.quiz.title %></strong>
+                        <span><%= lesson.quiz.totalMarks || 0 %> marks - <%= formatDurationFromMinutes(lesson.quiz.duration) %> - pass <%= lesson.quiz.passingMarks || 0 %>%</span>
+                      </div>
+                      <% if (lesson.quiz.status === 'published') { %>
+                        <a class="btn btn-sm btn-outline-primary" href="/student/quizzes/<%= lesson.quiz._id %>/take">Take Quiz</a>
+                      <% } else { %>
+                        <span class="badge text-bg-secondary">Draft quiz</span>
+                      <% } %>
+                    </div>
+                  <% } %>
+                </div>
+              <% } %>
+            </article>
+          <% }) %>
+        </main>
+
+        <aside class="course-study-sidebar" aria-label="Course outline">
+          <div class="course-outline-card">
+            <div>
+              <span class="eyebrow">Focus path</span>
+              <h2>Course outline</h2>
+            </div>
+            <nav class="course-outline-list">
+              <% courseLessons.forEach((lesson) => { %>
+                <%
+                  const isComplete = completedLessonIds.has(String(lesson._id));
+                  const isCurrentLesson = currentLesson && String(currentLesson._id) === String(lesson._id);
+                  const lessonMaterials = materialsByLesson.get(String(lesson._id)) || [];
+                  const hasVideo = lessonMaterials.some((material) => videoMaterialTypes.has(material.type));
+                %>
+                <a class="<%= isCurrentLesson ? 'is-current' : '' %>" href="#lesson-<%= lesson._id %>">
+                  <span class="course-outline-status <%= isComplete ? 'is-complete' : '' %>">
+                    <i class="fas <%= isComplete ? 'fa-check' : hasVideo ? 'fa-play' : 'fa-minus' %>"></i>
+                  </span>
+                  <span>
+                    <strong><%= lesson.position %>. <%= lesson.title %></strong>
+                    <small><%= hasVideo ? 'Class video inside' : 'Waiting for video' %></small>
+                  </span>
+                </a>
+              <% }) %>
+            </nav>
+          </div>
+        </aside>
+      </div>
+    <% } %>
+
+    <section class="table-card table-shell">
+      <div class="panel-header">
+        <div class="panel-header__copy">
+          <span class="eyebrow">Assignments</span>
+          <h2>Question PDFs and submissions</h2>
+          <p>Download the question PDF and submit your answer PDF before the deadline.</p>
+        </div>
+      </div>
+
+      <% if (!courseAssignments.length) { %>
+        <div class="empty-state">No assignments have been added yet.</div>
+      <% } else { %>
+        <div class="course-assignment-list">
+          <% courseAssignments.forEach((assignment) => { %>
+            <% const submission = assignmentSubmissions.get(String(assignment._id)); %>
+            <% const deadlinePassed = new Date(assignment.dueAt).getTime() < Date.now(); %>
+            <article class="course-assignment-item" id="assignment-<%= assignment._id %>">
+              <div class="course-assignment-item__top">
+                <div>
+                  <span class="status-pill <%= submission ? 'approved' : deadlinePassed ? 'rejected' : 'pending' %>">
+                    <%= submission ? 'Submitted' : deadlinePassed ? 'Closed' : 'Open' %>
+                  </span>
+                  <h3><%= assignment.position %>. <%= assignment.title %></h3>
+                  <p><%= assignment.instructions || 'Download the question PDF and upload your completed answer PDF.' %></p>
+                  <small>
+                    Due <%= new Date(assignment.dueAt).toLocaleString() %>
+                    <% if (assignment.maxMarks) { %> - <%= assignment.maxMarks %> marks<% } %>
+                    <% if (assignment.lesson) { %> - Section: <%= assignment.lesson.title %><% } %>
+                  </small>
+                </div>
+                <a class="btn btn-sm btn-outline-primary" href="<%= assignment.questionFileUrl %>" target="_blank" rel="noopener">Question PDF</a>
+              </div>
+
+              <% if (submission) { %>
+                <div class="course-assignment-submission course-assignment-submission--student">
+                  <div>
+                    <strong>Your submission</strong>
+                    <small>Submitted <%= new Date(submission.submittedAt).toLocaleString() %></small>
+                    <% if (submission.status === 'reviewed') { %>
+                      <p>
+                        Marks: <%= submission.marksAwarded || 0 %><% if (assignment.maxMarks) { %>/<%= assignment.maxMarks %><% } %>
+                        <% if (submission.teacherComment) { %> - <%= submission.teacherComment %><% } %>
+                      </p>
+                    <% } else { %>
+                      <p>Waiting for teacher review.</p>
+                    <% } %>
+                  </div>
+                  <a class="btn btn-sm btn-outline-primary" href="<%= submission.answerFileUrl %>" target="_blank" rel="noopener">Answer PDF</a>
+                </div>
+              <% } %>
+
+              <% if (!deadlinePassed) { %>
+                <form class="course-inline-form course-assignment-submit" action="/courses/<%= course._id %>/assignments/<%= assignment._id %>/submit" method="POST" enctype="multipart/form-data">
+                  <div class="builder-field-grid builder-field-grid--split">
+                    <div class="form-field">
+                      <label class="form-label" for="answerFile-<%= assignment._id %>"><%= submission ? 'Replace answer PDF' : 'Answer PDF' %></label>
+                      <input id="answerFile-<%= assignment._id %>" class="form-control" type="file" name="answerFile" accept="application/pdf,.pdf" required>
+                    </div>
+                    <div class="form-field course-assignment-submit__action">
+                      <button class="btn btn-primary" type="submit">
+                        <i class="fas fa-file-arrow-up"></i>
+                        <%= submission ? 'Replace Submission' : 'Submit Assignment' %>
+                      </button>
+                    </div>
+                  </div>
+                </form>
+              <% } else if (!submission) { %>
+                <div class="empty-state">The submission deadline has passed.</div>
+              <% } %>
+            </article>
+          <% }) %>
+        </div>
+      <% } %>
+    </section>
+
+    <section class="table-card table-shell">
+      <div class="panel-header">
+        <div class="panel-header__copy">
+          <span class="eyebrow">Online Sessions</span>
+          <h2>Live class schedule</h2>
+          <p>Join upcoming sessions or open recordings after class.</p>
+        </div>
+      </div>
+
+      <% if (!sessions.length) { %>
+        <div class="empty-state">No online sessions have been added yet.</div>
+      <% } else { %>
+        <div class="course-session-list">
+          <% sessions.forEach((session) => { %>
+            <article class="course-session-item">
+              <div>
+                <span class="status-pill <%= session.status === 'scheduled' ? 'approved' : session.status === 'completed' ? 'pending' : 'rejected' %>"><%= session.status %></span>
+                <h3><%= session.title %></h3>
+                <p><%= session.description || 'No session description.' %></p>
+                <small><%= new Date(session.scheduledAt).toLocaleString() %> - <%= formatDurationFromMinutes(session.durationMinutes) %></small>
+              </div>
+              <div class="course-session-links">
+                <% if (session.status === 'scheduled') { %>
+                  <a class="btn btn-sm btn-primary" href="<%= session.meetingUrl %>" target="_blank" rel="noopener">Join Session</a>
+                <% } %>
+                <% if (session.recordingUrl) { %>
+                  <a class="btn btn-sm btn-outline-primary" href="<%= session.recordingUrl %>" target="_blank" rel="noopener">Recording</a>
+                <% } %>
+              </div>
+            </article>
+          <% }) %>
+        </div>
+      <% } %>
+    </section>
+  </div>
+</section>

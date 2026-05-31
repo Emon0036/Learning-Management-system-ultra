@@ -1,0 +1,133 @@
+<% layout('layouts/main') %>
+<%
+  const formatDurationFromSeconds = (value) => {
+    const totalSeconds = Math.max(0, Math.round(Number(value || 0)));
+    const hours = Math.floor(totalSeconds / 3600);
+    const minutes = Math.floor((totalSeconds % 3600) / 60);
+    const seconds = totalSeconds % 60;
+    return `${hours} hr ${minutes} min ${seconds} sec`;
+  };
+  const formatDurationFromHours = (value) => formatDurationFromSeconds(Number(value || 0) * 3600);
+  const formatDurationFromMinutes = (value) => formatDurationFromSeconds(Number(value || 0) * 60);
+%>
+<section class="page-shell">
+  <div class="page-container page-stack">
+    <section class="dashboard-hero dashboard-hero--compact course-detail-hero">
+      <div class="dashboard-hero__grid">
+        <div class="dashboard-hero__content">
+          <span class="eyebrow"><%= course.category %> - <%= course.level %></span>
+          <h1><%= course.title %></h1>
+          <p><%= course.subtitle || course.description %></p>
+          <div class="course-hero-meta">
+            <span><i class="fas fa-user-tie"></i><%= course.teacher?.name || 'Teacher' %></span>
+            <span><i class="fas fa-clock"></i><%= formatDurationFromHours(course.durationHours) %></span>
+            <span><i class="fas fa-language"></i><%= course.language || 'English' %></span>
+          </div>
+        </div>
+        <div class="course-price-panel">
+          <strong><%= course.currency %> <%= Number(course.price || 0).toLocaleString() %></strong>
+          <span>Demo checkout only</span>
+          <% if (enrollment) { %>
+            <a class="btn btn-primary w-100" href="/courses/<%= course._id %>/learn">Continue Learning</a>
+          <% } else if (currentUser && currentUser.role === 'student') { %>
+            <a class="btn btn-success w-100" href="/courses/<%= course._id %>/checkout">Buy with Demo Payment</a>
+          <% } else if (!currentUser) { %>
+            <a class="btn btn-primary w-100" href="/auth/login">Login to Buy</a>
+          <% } %>
+        </div>
+      </div>
+    </section>
+
+    <div class="course-detail-grid">
+      <section class="table-card table-shell">
+        <div class="panel-header">
+          <div class="panel-header__copy">
+            <span class="eyebrow">About</span>
+            <h2>Course description</h2>
+          </div>
+        </div>
+        <p class="course-long-copy"><%= course.description %></p>
+
+        <% if ((course.outcomes || []).length) { %>
+          <div class="course-info-block">
+            <h3>What students will learn</h3>
+            <ul class="course-check-list">
+              <% course.outcomes.forEach((outcome) => { %>
+                <li><i class="fas fa-check"></i><span><%= outcome %></span></li>
+              <% }) %>
+            </ul>
+          </div>
+        <% } %>
+
+        <% if ((course.requirements || []).length) { %>
+          <div class="course-info-block">
+            <h3>Requirements</h3>
+            <ul class="course-check-list">
+              <% course.requirements.forEach((requirement) => { %>
+                <li><i class="fas fa-circle"></i><span><%= requirement %></span></li>
+              <% }) %>
+            </ul>
+          </div>
+        <% } %>
+      </section>
+
+      <aside class="table-card table-shell">
+        <div class="panel-header">
+          <div class="panel-header__copy">
+            <span class="eyebrow">Includes</span>
+            <h2>Course package</h2>
+          </div>
+        </div>
+        <div class="course-package-list">
+          <span><i class="fas fa-layer-group"></i><%= lessons.length %> lesson<%= lessons.length === 1 ? '' : 's' %></span>
+          <span><i class="fas fa-paperclip"></i><%= materials.length %> material<%= materials.length === 1 ? '' : 's' %></span>
+          <span><i class="fas fa-video"></i><%= sessions.length %> session<%= sessions.length === 1 ? '' : 's' %></span>
+          <span><i class="fas fa-file-pen"></i><%= assignments.length %> assignment<%= assignments.length === 1 ? '' : 's' %></span>
+          <span><i class="fas fa-circle-question"></i><%= lessons.filter((lesson) => lesson.quiz).length %> linked quiz<%= lessons.filter((lesson) => lesson.quiz).length === 1 ? '' : 'zes' %></span>
+        </div>
+      </aside>
+    </div>
+
+    <section class="table-card table-shell">
+      <div class="panel-header">
+        <div class="panel-header__copy">
+          <span class="eyebrow">Curriculum</span>
+          <h2>Lessons and resources</h2>
+          <p>Full material content, assignments, and class links unlock after demo purchase.</p>
+        </div>
+      </div>
+
+      <% if (!lessons.length) { %>
+        <div class="empty-state">This course does not have lessons yet.</div>
+      <% } else { %>
+        <div class="course-curriculum-list">
+          <% lessons.forEach((lesson) => { %>
+            <% const lessonMaterials = materialsByLesson.get(String(lesson._id)) || []; %>
+            <article class="course-lesson-card">
+              <div class="course-lesson-card__top">
+                <div>
+                  <span class="status-pill <%= lesson.isPreview ? 'approved' : 'pending' %>"><%= lesson.isPreview ? 'Preview' : 'Protected' %></span>
+                  <h3><%= lesson.position %>. <%= lesson.title %></h3>
+                  <p><%= lesson.description || 'Lesson details will be available inside the classroom.' %></p>
+                  <small><%= formatDurationFromMinutes(lesson.durationMinutes) %> - <%= lessonMaterials.length %> resource<%= lessonMaterials.length === 1 ? '' : 's' %></small>
+                  <% if (!lessonMaterials.length) { %>
+                    <span class="course-lesson-note"><i class="fas fa-video-slash"></i> No class video added yet</span>
+                  <% } %>
+                </div>
+              </div>
+              <% if (lesson.quiz) { %>
+                <div class="course-linked-quiz">
+                  <i class="fas fa-circle-question"></i>
+                  <div>
+                    <strong><%= lesson.quiz.title %></strong>
+                    <span>Linked quiz unlocks with the course.</span>
+                  </div>
+                </div>
+              <% } %>
+            </article>
+          <% }) %>
+        </div>
+      <% } %>
+    </section>
+  </div>
+</section>

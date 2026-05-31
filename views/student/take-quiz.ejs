@@ -1,0 +1,208 @@
+<% layout('layouts/main') %>
+<%
+  const hasCodingQuestions = quiz.questions.some((question) => question.type === 'coding');
+  const languageExtensions = {
+    c: 'c',
+    cpp: 'cpp',
+    'c++': 'cpp',
+    java: 'java',
+    javascript: 'js',
+    js: 'js',
+    python: 'py',
+    py: 'py',
+    php: 'php',
+    ruby: 'rb',
+    go: 'go',
+    rust: 'rs',
+    csharp: 'cs',
+    'c#': 'cs'
+  };
+  const getEditorFileName = (language = '') => {
+    const normalizedLanguage = String(language || '').trim().toLowerCase();
+    const extension = languageExtensions[normalizedLanguage] || 'txt';
+    return `solution.${extension}`;
+  };
+%>
+<section class="page-shell">
+  <div class="page-container page-stack">
+    <div class="quiz-header <%= hasCodingQuestions ? 'quiz-header--coding' : '' %>">
+      <div>
+        <span class="eyebrow"><%= hasCodingQuestions ? 'Coding Exam' : quiz.category %></span>
+        <h1><%= quiz.title %></h1>
+        <p>
+          <%= quiz.questions.length %> question<%= quiz.questions.length === 1 ? '' : 's' %> ·
+          <%= quiz.totalMarks %> marks total
+          <% if (hasCodingQuestions) { %>
+            · IDE-style workspace
+          <% } %>
+        </p>
+      </div>
+      <% if (quiz.thumbnailUrl) { %>
+        <img class="quiz-header__thumbnail" src="<%= quiz.thumbnailUrl %>" alt="<%= quiz.title %> thumbnail">
+      <% } %>
+      <div class="timer" data-duration="<%= quiz.duration %>">
+        <i class="fa-regular fa-clock"></i>
+        <span id="timerText"><%= quiz.duration %>:00</span>
+      </div>
+    </div>
+
+    <section class="exam-description-card">
+      <div>
+        <span class="eyebrow">Exam Instructions</span>
+        <h2>Read before you start answering</h2>
+        <p>
+          <%= quiz.description && quiz.description.trim()
+            ? quiz.description
+            : 'Answer every question carefully and submit before the timer ends.' %>
+        </p>
+      </div>
+      <div class="exam-description-grid">
+        <article>
+          <strong><%= quiz.duration %> min</strong>
+          <span>Duration</span>
+        </article>
+        <article>
+          <strong><%= quiz.totalMarks %></strong>
+          <span>Total marks</span>
+        </article>
+        <article>
+          <strong>2 x 5s</strong>
+          <span>Tab-switch grace</span>
+        </article>
+      </div>
+      <p class="exam-description-card__rules">
+        Short-answer and coding reference answers appear after submission, but final marks are given after teacher review. Copy, paste, dev tools, closing, or failing to return within the grace time can auto-submit the exam.
+      </p>
+    </section>
+
+    <div class="alert alert-warning small exam-security-alert">
+      <i class="fa-solid fa-shield-halved me-2"></i>
+      Copying, cutting, pasting, or opening developer tools will auto-submit immediately. If you accidentally switch tabs, you get 2 chances and 5 seconds to return each time.
+    </div>
+
+    <div class="alert alert-danger small exam-focus-warning d-none" id="examFocusWarning" role="alert" aria-live="assertive">
+      <i class="fa-solid fa-triangle-exclamation me-2"></i>
+      <span id="examFocusWarningText">Return to the exam tab.</span>
+    </div>
+
+    <form id="quizForm" action="/student/quizzes/<%= quiz._id %>/submit" method="POST" class="form-panel <%= hasCodingQuestions ? 'coding-exam-form' : '' %>">
+    <input type="hidden" name="timeSpent" id="timeSpent" value="0">
+    <input type="hidden" name="autoSubmitted" id="autoSubmitted" value="0">
+    <input type="hidden" name="autoSubmitReason" id="autoSubmitReason" value="">
+    
+    <% quiz.questions.forEach((question, index) => { %>
+      <article class="question-card <%= question.type === 'coding' ? 'question-card--coding' : '' %>">
+        <div class="question-card__top">
+          <div class="question-card__meta">
+            <span class="question-index"><%= index + 1 %></span>
+            <h2 class="question-card__title"><%= question.type === 'coding' ? `Coding problem ${index + 1}` : question.questionText %></h2>
+          </div>
+          <span class="status-pill approved"><%= question.marks %> mark<%= question.marks === 1 ? '' : 's' %></span>
+        </div>
+        
+        <% if (question.type === 'coding') { %>
+          <% const editorLanguage = question.language || 'Coding'; %>
+          <div class="coding-workspace" data-coding-workspace>
+            <div class="coding-workspace__brief">
+              <section class="coding-problem-card">
+                <div class="coding-panel-heading">
+                  <span class="status-pill approved">Problem</span>
+                  <strong><%= question.marks %> mark<%= question.marks === 1 ? '' : 's' %></strong>
+                </div>
+                <p><%= question.questionText %></p>
+              </section>
+
+              <section class="coding-problem-card">
+                <div class="coding-panel-heading">
+                  <span class="status-pill pending">Samples</span>
+                  <strong><%= question.testCases && question.testCases.length ? question.testCases.length : 0 %></strong>
+                </div>
+
+                <% if (question.testCases && question.testCases.length > 0) { %>
+                  <div class="coding-sample-list">
+                    <% question.testCases.forEach((testCase, tcIndex) => { %>
+                      <details class="coding-sample" <%= tcIndex === 0 ? 'open' : '' %>>
+                        <summary>
+                          <span>Sample <%= tcIndex + 1 %></span>
+                          <i class="fas fa-chevron-down"></i>
+                        </summary>
+                        <div class="coding-console-pair">
+                          <label>Input</label>
+                          <pre class="code-block"><code><%= testCase.input || '(empty input)' %></code></pre>
+                          <label>Expected output</label>
+                          <pre class="code-block"><code><%= testCase.expectedOutput || '(empty output)' %></code></pre>
+                        </div>
+                      </details>
+                    <% }) %>
+                  </div>
+                <% } else { %>
+                  <p class="coding-muted">No sample cases were added for this problem.</p>
+                <% } %>
+              </section>
+            </div>
+
+            <section class="coding-ide">
+              <div class="coding-ide__topbar">
+                <div class="coding-window-controls" aria-hidden="true">
+                  <span></span>
+                  <span></span>
+                  <span></span>
+                </div>
+                <div class="coding-file-tab">
+                  <i class="fas fa-code"></i>
+                  <span><%= getEditorFileName(editorLanguage) %></span>
+                </div>
+                <span class="coding-language-badge"><%= editorLanguage %></span>
+              </div>
+
+              <% if (question.codeTemplate && question.codeTemplate.trim()) { %>
+                <details class="coding-template-panel">
+                  <summary>
+                    <span>Starter template</span>
+                    <i class="fas fa-chevron-down"></i>
+                  </summary>
+                  <pre class="code-block"><code><%= question.codeTemplate %></code></pre>
+                </details>
+              <% } %>
+
+              <div class="coding-editor-shell">
+                <pre class="coding-line-numbers" aria-hidden="true" data-editor-lines>1</pre>
+                <textarea
+                  class="form-control code-editor coding-editor-textarea"
+                  name="code[<%= question._id %>]"
+                  data-language="<%= editorLanguage %>"
+                  data-code-editor
+                  rows="18"
+                  spellcheck="false"
+                  autocomplete="off"
+                  autocapitalize="off"
+                  placeholder="// Write your solution here"
+                  required><%= question.codeTemplate || '' %></textarea>
+              </div>
+
+              <div class="coding-ide__statusbar">
+                <span><i class="fas fa-circle"></i> Manual review after submit</span>
+                <span data-editor-status>Ln 1 · Col 1</span>
+              </div>
+            </section>
+          </div>
+        <% } else if (question.type === 'short-answer') { %>
+          <textarea class="form-control" name="answers[<%= question._id %>]" rows="3" placeholder="Write your answer" required></textarea>
+        <% } else { %>
+          <% question.options.forEach((option) => { %>
+            <label class="answer-option">
+              <input type="radio" name="answers[<%= question._id %>]" value="<%= option %>" required>
+              <span><%= option %></span>
+            </label>
+          <% }) %>
+        <% } %>
+      </article>
+    <% }) %>
+    
+    <button class="btn btn-primary btn-lg" type="submit">Submit <%= quiz.examType === 'coding-test' ? 'Exam' : 'Quiz' %></button>
+    </form>
+  </div>
+</section>
+
+<script src="/js/codingExamEditor.js"></script>
+<script src="/js/quizTimer.js"></script>

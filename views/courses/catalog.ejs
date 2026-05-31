@@ -1,0 +1,101 @@
+<% layout('layouts/main') %>
+<%
+  const formatDurationFromSeconds = (value) => {
+    const totalSeconds = Math.max(0, Math.round(Number(value || 0)));
+    const hours = Math.floor(totalSeconds / 3600);
+    const minutes = Math.floor((totalSeconds % 3600) / 60);
+    const seconds = totalSeconds % 60;
+    return `${hours} hr ${minutes} min ${seconds} sec`;
+  };
+  const formatDurationFromHours = (value) => formatDurationFromSeconds(Number(value || 0) * 3600);
+%>
+<section class="page-shell">
+  <div class="page-container page-stack">
+    <div class="page-heading">
+      <div>
+        <span class="eyebrow">LMS Catalog</span>
+        <h1>Courses</h1>
+        <p>Browse teacher-created courses with demo checkout. No real transaction is required.</p>
+      </div>
+      <div class="toolbar">
+        <% if (currentUser && currentUser.role === 'student') { %>
+          <a href="/courses/my-learning" class="btn btn-primary">My Learning</a>
+        <% } %>
+      </div>
+    </div>
+
+    <form class="filter-bar" method="GET" action="/courses">
+      <input class="form-control" name="q" value="<%= search || '' %>" placeholder="Search courses">
+      <select class="form-select" name="teacher">
+        <option value="all" <%= selectedTeacherId === 'all' ? 'selected' : '' %>>All teachers</option>
+        <% (teacherOptions || []).forEach((teacher) => { %>
+          <option value="<%= teacher.id %>" <%= selectedTeacherId === teacher.id ? 'selected' : '' %>><%= teacher.name %></option>
+        <% }) %>
+      </select>
+      <select class="form-select" name="category">
+        <option value="all" <%= selectedCategory === 'all' ? 'selected' : '' %>>All categories</option>
+        <% (categories || []).forEach((category) => { %>
+          <option value="<%= category %>" <%= selectedCategory === category ? 'selected' : '' %>><%= category %></option>
+        <% }) %>
+      </select>
+      <select class="form-select" name="level">
+        <option value="all" <%= selectedLevel === 'all' ? 'selected' : '' %>>All levels</option>
+        <% ['Beginner', 'Intermediate', 'Advanced'].forEach((level) => { %>
+          <option value="<%= level %>" <%= selectedLevel === level ? 'selected' : '' %>><%= level %></option>
+        <% }) %>
+      </select>
+      <button class="btn btn-outline-primary" type="submit">
+        <i class="fas fa-sliders"></i>
+        Filter
+      </button>
+    </form>
+
+    <% if (!courses.length) { %>
+      <div class="empty-state">
+        <h3>No courses matched these filters</h3>
+        <p>Try a broader search, category, level, or teacher.</p>
+      </div>
+    <% } else { %>
+      <div class="action-grid course-catalog-grid">
+        <% courses.forEach((course) => { %>
+          <% const enrollment = enrollmentByCourseId.get(String(course._id)); %>
+          <article class="quiz-card course-card">
+            <div class="quiz-card__thumbnail">
+              <% if (course.thumbnailUrl) { %>
+                <img src="<%= course.thumbnailUrl %>" alt="<%= course.title %> thumbnail" loading="lazy">
+              <% } else { %>
+                <div class="quiz-card__thumbnail-placeholder">
+                  <i class="fas fa-graduation-cap"></i>
+                </div>
+              <% } %>
+            </div>
+            <div class="quiz-card__meta">
+              <span class="badge text-bg-light"><%= course.category %></span>
+              <span class="badge text-bg-secondary"><%= course.level %></span>
+              <span class="badge text-bg-primary"><%= course.currency %> <%= Number(course.price || 0).toLocaleString() %></span>
+            </div>
+            <div class="quiz-card__copy">
+              <h2><%= course.title %></h2>
+              <p class="mt-2"><%= course.subtitle || course.description %></p>
+            </div>
+            <div class="quiz-card__facts">
+              <span><i class="fas fa-user-tie me-2"></i><%= course.teacher?.name || 'Teacher' %></span>
+              <span><i class="fas fa-clock me-2"></i><%= formatDurationFromHours(course.durationHours) %></span>
+              <span><i class="fas fa-language me-2"></i><%= course.language || 'English' %></span>
+            </div>
+            <div class="quiz-card__actions">
+              <a class="btn btn-outline-secondary btn-sm" href="/courses/<%= course._id %>">Details</a>
+              <% if (enrollment) { %>
+                <a class="btn btn-primary btn-sm" href="/courses/<%= course._id %>/learn">Continue <%= enrollment.progressPercentage || 0 %>%</a>
+              <% } else if (currentUser && currentUser.role === 'student') { %>
+                <a class="btn btn-success btn-sm" href="/courses/<%= course._id %>/checkout">Buy Demo</a>
+              <% } else if (!currentUser) { %>
+                <a class="btn btn-primary btn-sm" href="/auth/login">Login to Buy</a>
+              <% } %>
+            </div>
+          </article>
+        <% }) %>
+      </div>
+    <% } %>
+  </div>
+</section>

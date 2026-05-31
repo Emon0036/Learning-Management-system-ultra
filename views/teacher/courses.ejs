@@ -1,0 +1,113 @@
+<% layout('layouts/main') %>
+<%
+  const formatDurationFromSeconds = (value) => {
+    const totalSeconds = Math.max(0, Math.round(Number(value || 0)));
+    const hours = Math.floor(totalSeconds / 3600);
+    const minutes = Math.floor((totalSeconds % 3600) / 60);
+    const seconds = totalSeconds % 60;
+    return `${hours} hr ${minutes} min ${seconds} sec`;
+  };
+  const formatDurationFromHours = (value) => formatDurationFromSeconds(Number(value || 0) * 3600);
+%>
+<section class="page-shell">
+  <div class="page-container page-stack">
+    <div class="page-heading">
+      <div>
+        <span class="eyebrow">Teacher LMS</span>
+        <h1>Manage Courses</h1>
+        <p>Create paid demo courses with sections, community links, YouTube classes, live sessions, files, assignments, and linked quizzes.</p>
+      </div>
+      <a href="/teacher/courses/new" class="btn btn-primary"><i class="fa-solid fa-plus"></i>Create Course</a>
+    </div>
+
+    <div class="summary-grid">
+      <article class="summary-card">
+        <span>Total Courses</span>
+        <strong><%= stats.totalCourses %></strong>
+        <small>all courses in your LMS library</small>
+      </article>
+      <article class="summary-card">
+        <span>Published</span>
+        <strong><%= stats.publishedCourses %></strong>
+        <small>courses visible in the catalog</small>
+      </article>
+      <article class="summary-card">
+        <span>Drafts</span>
+        <strong><%= stats.draftCourses %></strong>
+        <small>courses still being prepared</small>
+      </article>
+    </div>
+
+    <div class="table-card table-shell">
+      <div class="panel-header">
+        <div class="panel-header__copy">
+          <span class="eyebrow">Course Library</span>
+          <h2>Your courses</h2>
+          <p>Publish only when lessons and materials are ready for students.</p>
+        </div>
+      </div>
+
+      <div class="table-responsive">
+        <table class="table align-middle">
+          <thead>
+            <tr>
+              <th>Course</th>
+              <th>Category</th>
+              <th>Price</th>
+              <th>Lessons</th>
+              <th>Students</th>
+              <th>Status</th>
+              <th class="text-end">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% if (!courses.length) { %>
+              <tr>
+                <td colspan="7" class="text-center text-muted py-4">No courses yet.</td>
+              </tr>
+            <% } %>
+            <% courses.forEach((course) => { %>
+              <tr>
+                <td>
+                  <div class="quiz-table-title">
+                    <% if (course.thumbnailUrl) { %>
+                      <img src="<%= course.thumbnailUrl %>" alt="<%= course.title %> thumbnail" loading="lazy">
+                    <% } else { %>
+                      <span class="quiz-table-title__placeholder"><i class="fas fa-graduation-cap"></i></span>
+                    <% } %>
+                    <div>
+                      <strong><%= course.title %></strong>
+                      <div class="small text-muted"><%= course.level %> - <%= formatDurationFromHours(course.durationHours) %> - <%= course.upcomingSessionCount || 0 %> upcoming session<%= Number(course.upcomingSessionCount || 0) === 1 ? '' : 's' %></div>
+                    </div>
+                  </div>
+                </td>
+                <td><%= course.category %></td>
+                <td><%= course.currency %> <%= Number(course.price || 0).toLocaleString() %></td>
+                <td><%= course.lessonCount || 0 %></td>
+                <td><%= course.enrolledCount || 0 %></td>
+                <td><span class="badge <%= course.status === 'published' ? 'text-bg-success' : 'text-bg-secondary' %>"><%= course.status %></span></td>
+                <td class="text-end">
+                  <div class="action-stack">
+                    <a class="btn btn-outline-primary" href="/teacher/courses/<%= course._id %>/edit">Edit</a>
+                    <a class="btn btn-outline-secondary" href="/teacher/courses/<%= course._id %>/students">Students</a>
+                    <% if (course.status === 'published') { %>
+                      <a class="btn btn-outline-secondary" href="/courses/<%= course._id %>">View</a>
+                    <% } %>
+                  </div>
+                  <div class="action-stack mt-2">
+                    <form action="/teacher/courses/<%= course._id %>/publish?_method=PATCH" method="POST" class="inline-form">
+                      <button class="btn btn-outline-success"><%= course.status === 'published' ? 'Unpublish' : 'Publish' %></button>
+                    </form>
+                    <form action="/teacher/courses/<%= course._id %>?_method=DELETE" method="POST" class="inline-form" onsubmit="return confirm('Delete this course and its LMS content?')">
+                      <button class="btn btn-outline-danger">Delete</button>
+                    </form>
+                  </div>
+                </td>
+              </tr>
+            <% }) %>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</section>

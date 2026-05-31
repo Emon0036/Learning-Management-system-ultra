@@ -1,0 +1,66 @@
+<% layout('layouts/main') %>
+<section class="page-shell">
+  <div class="page-container page-stack">
+    <div class="page-heading">
+      <div>
+        <span class="eyebrow">Student LMS</span>
+        <h1>My Learning</h1>
+        <p>Courses you unlocked with demo checkout appear here with progress and classroom links.</p>
+      </div>
+      <a href="/courses" class="btn btn-outline-primary">Browse Courses</a>
+    </div>
+
+    <% if (!enrollments.length) { %>
+      <div class="empty-state">
+        <h3>No courses purchased yet</h3>
+        <p>Browse the course catalog and complete a demo checkout to unlock a classroom.</p>
+        <a href="/courses" class="btn btn-primary mt-3">Browse Courses</a>
+      </div>
+    <% } else { %>
+      <div class="action-grid course-catalog-grid">
+        <% enrollments.forEach((enrollment) => { %>
+          <% const course = enrollment.course; %>
+          <article class="quiz-card course-card">
+            <div class="quiz-card__thumbnail">
+              <% if (course.thumbnailUrl) { %>
+                <img src="<%= course.thumbnailUrl %>" alt="<%= course.title %> thumbnail" loading="lazy">
+              <% } else { %>
+                <div class="quiz-card__thumbnail-placeholder">
+                  <i class="fas fa-graduation-cap"></i>
+                </div>
+              <% } %>
+            </div>
+            <div class="quiz-card__meta">
+              <span class="badge text-bg-light"><%= course.category %></span>
+              <span class="badge text-bg-secondary"><%= course.level %></span>
+              <span class="badge text-bg-primary"><%= enrollment.status %></span>
+            </div>
+            <div class="quiz-card__copy">
+              <h2><%= course.title %></h2>
+              <p class="mt-2"><%= course.subtitle || course.description %></p>
+            </div>
+            <div class="course-progress-meter">
+              <div class="chart-bar__top">
+                <strong>Progress</strong>
+                <span><%= enrollment.progressPercentage || 0 %>%</span>
+              </div>
+              <div class="chart-bar__track">
+                <span class="chart-bar__fill chart-bar__fill--success" style="width: <%= enrollment.progressPercentage || 0 %>%"></span>
+              </div>
+            </div>
+            <div class="quiz-card__facts">
+              <span><i class="fas fa-user-tie me-2"></i><%= course.teacher?.name || 'Teacher' %></span>
+              <% if (enrollment.purchase) { %>
+                <span><i class="fas fa-receipt me-2"></i><%= enrollment.purchase.transactionId %></span>
+              <% } %>
+            </div>
+            <div class="quiz-card__actions">
+              <a class="btn btn-primary btn-sm" href="/courses/<%= course._id %>/learn">Open Classroom</a>
+              <a class="btn btn-outline-secondary btn-sm" href="/courses/<%= course._id %>">Details</a>
+            </div>
+          </article>
+        <% }) %>
+      </div>
+    <% } %>
+  </div>
+</section>

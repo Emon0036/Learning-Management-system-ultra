@@ -1,0 +1,83 @@
+<%
+  const materialLabels = {
+    note: 'Note',
+    file: 'File',
+    'recorded-class': 'Recorded class',
+    'external-link': 'External link',
+    'community-link': 'Community link',
+    'youtube-class': 'YouTube class'
+  };
+  const materialTypeLabel = materialLabels[material.type] || String(material.type || 'Material').replace(/-/g, ' ');
+  const materialUrl = String(material.resourceUrl || '').trim();
+  let youtubeEmbedUrl = '';
+  let directVideoUrl = '';
+
+  if (materialUrl) {
+    try {
+      const parsedUrl = new URL(materialUrl, 'https://quizmaster.local');
+      const host = parsedUrl.hostname.replace(/^www\./, '').toLowerCase();
+      const pathParts = parsedUrl.pathname.split('/').filter(Boolean);
+
+      let youtubeId = '';
+      if (host === 'youtu.be') {
+        youtubeId = pathParts[0] || '';
+      } else if (host === 'youtube.com' || host === 'm.youtube.com') {
+        if (pathParts[0] === 'watch') youtubeId = parsedUrl.searchParams.get('v') || '';
+        if (pathParts[0] === 'embed' || pathParts[0] === 'shorts') youtubeId = pathParts[1] || '';
+      }
+
+      if (youtubeId) youtubeEmbedUrl = `https://www.youtube-nocookie.com/embed/${youtubeId}?rel=0&modestbranding=1&playsinline=1`;
+    } catch {}
+
+    if (/\.(mp4|webm|ogg)(\?.*)?$/i.test(materialUrl)) {
+      directVideoUrl = materialUrl;
+    }
+  }
+
+  const isVideoMaterial = ['youtube-class', 'recorded-class'].includes(material.type);
+  const hasEmbeddedVideo = isVideoMaterial && (youtubeEmbedUrl || directVideoUrl);
+  const hideVideoLink = isVideoMaterial && typeof hideVideoExternalLink !== 'undefined' && hideVideoExternalLink;
+%>
+<article class="course-material-row course-material-row--student <%= hasEmbeddedVideo ? 'course-material-row--video' : '' %> <%= hideVideoLink ? 'course-material-row--quiet-video' : '' %>">
+  <div class="course-material-row__copy">
+    <% if (!hideVideoLink) { %>
+      <span class="badge text-bg-light"><%= materialTypeLabel %></span>
+    <% } %>
+    <strong><%= material.title %></strong>
+    <% if (material.type === 'note' && material.content) { %>
+      <p><%= material.content %></p>
+    <% } else if (material.content) { %>
+      <small><%= material.content %></small>
+    <% } %>
+    <% if (material.fileName) { %>
+      <small><%= material.fileName %></small>
+    <% } %>
+  </div>
+
+  <% if (youtubeEmbedUrl && isVideoMaterial) { %>
+    <div class="course-video-player">
+      <iframe
+        src="<%= youtubeEmbedUrl %>"
+        title="<%= material.title %> video"
+        loading="lazy"
+        referrerpolicy="strict-origin-when-cross-origin"
+        sandbox="allow-scripts allow-same-origin allow-presentation"
+        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+        allowfullscreen
+      ></iframe>
+    </div>
+  <% } else if (directVideoUrl && isVideoMaterial) { %>
+    <div class="course-video-player">
+      <video controls preload="metadata" src="<%= directVideoUrl %>"></video>
+    </div>
+  <% } %>
+
+  <% if (materialUrl && !hideVideoLink) { %>
+    <div class="course-material-row__actions">
+      <a class="btn btn-sm btn-outline-primary" href="<%= materialUrl %>" target="_blank" rel="noopener">
+        <i class="fas fa-arrow-up-right-from-square"></i>
+        <%= hasEmbeddedVideo ? 'Open video' : 'Open' %>
+      </a>
+    </div>
+  <% } %>
+</article>

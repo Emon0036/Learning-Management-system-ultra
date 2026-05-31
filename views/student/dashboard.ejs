@@ -1,0 +1,513 @@
+<% layout('layouts/main') %>
+<%
+  const dashboardExamTypeCounts = {
+    quiz: 0,
+    'true-false': 0,
+    'short-answer': 0,
+    'coding-test': 0,
+    ...(examTypeCounts || {})
+  };
+  const dashboardStats = {
+    enrolledCount: 0,
+    completedCount: 0,
+    pendingReviewCount: 0,
+    availableQuizCount: 0,
+    availableCourseCount: 0,
+    myCourseCount: 0,
+    ...(stats || {})
+  };
+  const dashboardProgress = {
+    averageScore: 0,
+    totalPoints: 0,
+    streak: 0,
+    totalQuizzes: 0,
+    completedQuizzes: 0,
+    inProgressQuizzes: 0,
+    totalAttempts: 0,
+    passedQuizzes: 0,
+    failedQuizzes: 0,
+    ...(progress || {})
+  };
+  const latestAttempt = recentAttempts && recentAttempts.length ? recentAttempts[0] : null;
+  const latestAttemptScore = latestAttempt ? Number(latestAttempt.score || 0) : 0;
+  const latestAttemptTotal = latestAttempt ? Number(latestAttempt.totalMarks || 0) : 0;
+  const latestAttemptPercent = latestAttempt ? Number(latestAttempt.percentage || 0) : 0;
+  const latestAttemptDate = latestAttempt ? latestAttempt.submittedAt || latestAttempt.createdAt : null;
+  const progressTotalQuizzes = Number(dashboardProgress.totalQuizzes || dashboardStats.enrolledCount || 0);
+  const progressCompletedQuizzes = Number(dashboardProgress.completedQuizzes || 0);
+  const progressInProgressQuizzes = Number(dashboardProgress.inProgressQuizzes || 0);
+  const progressTotalAttempts = Number(dashboardProgress.totalAttempts || 0);
+  const progressPassedQuizzes = Number(dashboardProgress.passedQuizzes || 0);
+  const progressFailedQuizzes = Number(dashboardProgress.failedQuizzes || 0);
+  const progressReviewedOutcomes = progressPassedQuizzes + progressFailedQuizzes;
+  const dashboardCompletionRate = progressTotalQuizzes
+    ? Math.max(0, Math.min(100, Math.round((progressCompletedQuizzes / progressTotalQuizzes) * 100)))
+    : 0;
+  const dashboardPassRate = progressReviewedOutcomes
+    ? Math.max(0, Math.min(100, Math.round((progressPassedQuizzes / progressReviewedOutcomes) * 100)))
+    : 0;
+  const finalizedAttemptCount = Math.max(progressTotalAttempts - Number(dashboardStats.pendingReviewCount || 0), 0);
+  const finalizedRate = progressTotalAttempts
+    ? Math.max(0, Math.min(100, Math.round((finalizedAttemptCount / progressTotalAttempts) * 100)))
+    : 0;
+  const studentExamSegments = [
+    {
+      label: 'Quizzes',
+      detail: 'Multiple choice and mixed exams',
+      count: Number(dashboardExamTypeCounts.quiz || 0),
+      color: '#0e5c8b'
+    },
+    {
+      label: 'True/False',
+      detail: 'Fast concept checks',
+      count: Number(dashboardExamTypeCounts['true-false'] || 0),
+      color: '#1c9b8f'
+    },
+    {
+      label: 'Short Answer',
+      detail: 'Teacher-reviewed responses',
+      count: Number(dashboardExamTypeCounts['short-answer'] || 0),
+      color: '#f59e0b'
+    },
+    {
+      label: 'Coding Tests',
+      detail: 'Hands-on programming exams',
+      count: Number(dashboardExamTypeCounts['coding-test'] || 0),
+      color: '#c2410c'
+    }
+  ];
+  const totalExamMix = studentExamSegments.reduce((sum, segment) => sum + segment.count, 0);
+  let studentChartFill = 'conic-gradient(rgba(67, 108, 140, 0.18) 0deg 360deg)';
+
+  if (totalExamMix > 0) {
+    let currentAngle = 0;
+    studentChartFill = `conic-gradient(${studentExamSegments
+      .filter((segment) => segment.count > 0)
+      .map((segment) => {
+        const startAngle = currentAngle;
+        currentAngle += (segment.count / totalExamMix) * 360;
+        return `${segment.color} ${startAngle}deg ${currentAngle}deg`;
+      })
+      .join(', ')})`;
+  }
+
+  let studentFocusTitle = 'Stay on your current momentum';
+  let studentFocusCopy = 'Your workspace is balanced. Pick one small next step and keep moving.';
+  let studentFocusHref = '/enrollments/my-quizzes';
+  let studentFocusLabel = 'Open my exams';
+
+  if (dashboardStats.pendingReviewCount > 0) {
+    studentFocusTitle = 'Feedback is waiting in review';
+    studentFocusCopy = `You have ${dashboardStats.pendingReviewCount} submission${dashboardStats.pendingReviewCount === 1 ? '' : 's'} waiting for teacher review.`;
+    studentFocusHref = '/student/reviews';
+    studentFocusLabel = 'Open review center';
+  } else if (progressInProgressQuizzes > 0) {
+    studentFocusTitle = 'Finish what you started';
+    studentFocusCopy = `${progressInProgressQuizzes} in-progress exam${progressInProgressQuizzes === 1 ? '' : 's'} are ready to continue.`;
+    studentFocusHref = '/enrollments/my-quizzes';
+    studentFocusLabel = 'Continue exams';
+  } else if (dashboardStats.availableQuizCount > 0) {
+    studentFocusTitle = 'A new exam is available';
+    studentFocusCopy = `${dashboardStats.availableQuizCount} published exam${dashboardStats.availableQuizCount === 1 ? '' : 's'} can be joined.`;
+    studentFocusHref = '/enrollments/browse';
+    studentFocusLabel = 'Browse exams';
+  }
+
+  const studentGlanceCards = [
+    {
+      label: 'Enrolled',
+      value: dashboardStats.enrolledCount,
+      meta: 'In your workspace',
+      icon: 'fa-layer-group'
+    },
+    {
+      label: 'Submitted',
+      value: dashboardStats.completedCount,
+      meta: 'Attempts recorded',
+      icon: 'fa-file-signature'
+    },
+    {
+      label: 'Review',
+      value: dashboardStats.pendingReviewCount,
+      meta: 'Waiting for feedback',
+      icon: 'fa-hourglass-half'
+    },
+    {
+      label: 'Available',
+      value: dashboardStats.availableQuizCount,
+      meta: 'Ready to join',
+      icon: 'fa-compass'
+    },
+    {
+      label: 'Courses',
+      value: dashboardStats.myCourseCount,
+      meta: 'Purchased demo',
+      icon: 'fa-graduation-cap'
+    }
+  ];
+
+  const studentScoreNotes = [
+    {
+      icon: 'fa-divide',
+      title: 'Latest attempt formula',
+      copy: 'Percentage comes from marks earned divided by total marks.',
+      value: latestAttempt ? `${latestAttemptScore}/${latestAttemptTotal} = ${latestAttemptPercent}%` : 'No attempt yet'
+    },
+    {
+      icon: 'fa-clipboard-check',
+      title: 'Finalized attempts',
+      copy: 'Only finalized results affect average score, points, and leaderboard position.',
+      value: finalizedAttemptCount
+    },
+    {
+      icon: 'fa-star',
+      title: 'Total points',
+      copy: 'Difficulty multipliers are added after the final percentage is known.',
+      value: dashboardProgress.totalPoints
+    },
+    {
+      icon: 'fa-medal',
+      title: 'Pass and fail record',
+      copy: 'Pass rate is based only on reviewed or finalized results.',
+      value: `${progressPassedQuizzes} passed / ${progressFailedQuizzes} failed`
+    }
+  ];
+%>
+
+<section class="page-shell">
+  <div class="page-container page-stack">
+    <section class="dashboard-hero dashboard-hero--compact animate-fade-in">
+      <div class="dashboard-hero__grid">
+        <div class="dashboard-hero__content">
+          <span class="eyebrow">Student Workspace</span>
+          <h1>Dashboard</h1>
+          <p>Clean view of your exams, progress, and review status.</p>
+        </div>
+
+        <div class="hero-action-row dashboard-hero__actions">
+          <a href="/enrollments/my-quizzes" class="btn btn-primary">
+            <i class="fas fa-book-open"></i>
+            Continue
+          </a>
+          <a href="/courses/my-learning" class="btn btn-outline-primary">
+            <i class="fas fa-graduation-cap"></i>
+            Courses
+          </a>
+          <a href="/enrollments/browse" class="btn btn-outline-primary">
+            <i class="fas fa-search"></i>
+            Browse
+          </a>
+          <a href="/enrollments/progress" class="btn btn-outline-primary">
+            <i class="fas fa-chart-line"></i>
+            Progress
+          </a>
+        </div>
+      </div>
+    </section>
+
+    <section class="dashboard-layered dashboard-layered--student">
+      <input class="dashboard-layer-control" type="radio" name="student-dashboard-layer" id="student-layer-today" checked>
+      <input class="dashboard-layer-control" type="radio" name="student-dashboard-layer" id="student-layer-progress">
+      <input class="dashboard-layer-control" type="radio" name="student-dashboard-layer" id="student-layer-activity">
+      <input class="dashboard-layer-control" type="radio" name="student-dashboard-layer" id="student-layer-details">
+
+      <div class="dashboard-layer-tabs" aria-label="Student dashboard layers">
+        <label for="student-layer-today"><i class="fas fa-bullseye"></i><span>Today</span></label>
+        <label for="student-layer-progress"><i class="fas fa-chart-line"></i><span>Progress</span></label>
+        <label for="student-layer-activity"><i class="fas fa-clock-rotate-left"></i><span>Activity</span></label>
+        <label for="student-layer-details"><i class="fas fa-sliders"></i><span>Details</span></label>
+      </div>
+
+      <div class="dashboard-layer-panels">
+        <section class="dashboard-layer-panel dashboard-layer-panel--today">
+          <div class="dashboard-layer-grid dashboard-layer-grid--focus">
+            <aside class="dashboard-focus-card">
+              <div>
+                <span class="eyebrow">Focus Today</span>
+                <h2><%= studentFocusTitle %></h2>
+                <p><%= studentFocusCopy %></p>
+              </div>
+
+              <div class="dashboard-focus-stats">
+                <article>
+                  <span>Completion</span>
+                  <strong><%= dashboardCompletionRate %>%</strong>
+                </article>
+                <article>
+                  <span>Pass Rate</span>
+                  <strong><%= dashboardPassRate %>%</strong>
+                </article>
+                <article>
+                  <span>Latest</span>
+                  <strong><%= latestAttempt ? `${latestAttemptPercent}%` : 'None' %></strong>
+                </article>
+              </div>
+
+              <a href="<%= studentFocusHref %>" class="btn btn-primary">
+                <i class="fas fa-arrow-right"></i>
+                <%= studentFocusLabel %>
+              </a>
+
+              <small class="dashboard-focus-note">
+                <% if (latestAttemptDate) { %>
+                  Last attempt: <%= new Date(latestAttemptDate).toLocaleDateString() %>
+                <% } else { %>
+                  Take an exam to start your activity history.
+                <% } %>
+              </small>
+            </aside>
+
+            <div class="dashboard-glance-grid dashboard-glance-grid--stacked">
+              <% studentGlanceCards.forEach((card) => { %>
+                <article class="dashboard-kpi-card">
+                  <div class="dashboard-kpi-card__top">
+                    <div>
+                      <span class="dashboard-kpi-card__label"><%= card.label %></span>
+                      <strong class="dashboard-kpi-card__value"><%= card.value %></strong>
+                    </div>
+                    <span class="dashboard-kpi-card__icon"><i class="fas <%= card.icon %>"></i></span>
+                  </div>
+                  <p class="dashboard-kpi-card__meta"><%= card.meta %></p>
+                </article>
+              <% }) %>
+            </div>
+          </div>
+        </section>
+
+        <section class="dashboard-layer-panel dashboard-layer-panel--progress">
+          <div class="dashboard-layer-grid">
+            <article class="chart-card">
+              <div class="panel-header">
+                <div class="panel-header__copy">
+                  <span class="eyebrow">Exam Mix</span>
+                  <h2>Enrolled exam types</h2>
+                  <p>Your current workspace split.</p>
+                </div>
+              </div>
+
+              <div class="chart-card__body">
+                <div class="donut-chart" style="--chart-fill: <%= studentChartFill %>;">
+                  <div class="donut-chart__center">
+                    <strong class="donut-chart__value"><%= totalExamMix %></strong>
+                    <span class="donut-chart__label">Tracked</span>
+                  </div>
+                </div>
+
+                <div class="chart-legend">
+                  <% studentExamSegments.forEach((segment) => { %>
+                    <div class="legend-item">
+                      <span class="legend-dot" style="background: <%= segment.color %>;"></span>
+                      <div class="legend-copy">
+                        <strong><%= segment.label %></strong>
+                        <span><%= segment.detail %></span>
+                      </div>
+                      <span class="legend-value"><%= segment.count %></span>
+                    </div>
+                  <% }) %>
+                </div>
+              </div>
+            </article>
+
+            <article class="support-card dashboard-story-card">
+              <div>
+                <span class="eyebrow">Score Snapshot</span>
+                <h3>Progress numbers</h3>
+              </div>
+
+              <div class="dashboard-progress-list">
+                <div class="dashboard-progress-row">
+                  <div class="chart-bar__top">
+                    <strong>Completion</strong>
+                    <span><%= progressCompletedQuizzes %> of <%= progressTotalQuizzes %></span>
+                  </div>
+                  <div class="chart-bar__track">
+                    <span class="chart-bar__fill chart-bar__fill--completion" style="width: <%= dashboardCompletionRate %>%"></span>
+                  </div>
+                </div>
+
+                <div class="dashboard-progress-row">
+                  <div class="chart-bar__top">
+                    <strong>Pass rate</strong>
+                    <span><%= progressPassedQuizzes %> passed</span>
+                  </div>
+                  <div class="chart-bar__track">
+                    <span class="chart-bar__fill chart-bar__fill--success" style="width: <%= dashboardPassRate %>%"></span>
+                  </div>
+                </div>
+
+                <div class="dashboard-progress-row">
+                  <div class="chart-bar__top">
+                    <strong>Finalized</strong>
+                    <span><%= finalizedAttemptCount %> of <%= progressTotalAttempts %></span>
+                  </div>
+                  <div class="chart-bar__track">
+                    <span class="chart-bar__fill chart-bar__fill--accent" style="width: <%= finalizedRate %>%"></span>
+                  </div>
+                </div>
+              </div>
+
+              <div class="dashboard-inline-stats">
+                <article>
+                  <span>Average</span>
+                  <strong><%= dashboardProgress.averageScore %>%</strong>
+                </article>
+                <article>
+                  <span>Points</span>
+                  <strong><%= dashboardProgress.totalPoints %></strong>
+                </article>
+                <article>
+                  <span>Streak</span>
+                  <strong><%= dashboardProgress.streak %></strong>
+                </article>
+              </div>
+            </article>
+          </div>
+        </section>
+
+        <section class="dashboard-layer-panel dashboard-layer-panel--activity">
+          <div class="dashboard-layer-grid">
+            <section class="table-card table-shell">
+              <div class="panel-header">
+                <div class="panel-header__copy">
+                  <span class="eyebrow">Recent Activity</span>
+                  <h2>Latest attempts</h2>
+                  <p>Your five newest submissions.</p>
+                </div>
+                <a href="/student/history" class="btn btn-outline-primary btn-sm">Full history</a>
+              </div>
+
+              <% if (recentAttempts && recentAttempts.length > 0) { %>
+                <div class="activity-list">
+                  <% recentAttempts.slice(0, 5).forEach((attempt) => { %>
+                    <% const attemptQuiz = attempt.quiz || {}; %>
+                    <% const attemptDate = attempt.submittedAt || attempt.createdAt; %>
+                    <article class="activity-item">
+                      <div class="activity-item__main">
+                        <span class="activity-item__icon"><i class="fas fa-file-signature"></i></span>
+                        <div>
+                          <p class="activity-item__title"><%= attemptQuiz.title || 'Removed quiz' %></p>
+                          <p class="activity-item__meta">
+                            <%= attemptQuiz.category || 'General' %> ·
+                            <%= attemptDate ? new Date(attemptDate).toLocaleDateString() : 'No date available' %>
+                          </p>
+                        </div>
+                      </div>
+                      <div class="activity-score">
+                        <strong><%= attempt.percentage %>%</strong>
+                        <span><%= attempt.status === 'pending-review' ? 'Pending review' : 'Recorded score' %></span>
+                      </div>
+                    </article>
+                  <% }) %>
+                </div>
+              <% } else { %>
+                <div class="empty-state">
+                  <h3>No recent attempts yet</h3>
+                  <p>Your latest activity will appear here.</p>
+                  <a href="/enrollments/browse" class="btn btn-primary mt-3">Browse exams</a>
+                </div>
+              <% } %>
+            </section>
+
+            <section class="table-card table-shell">
+              <div class="panel-header">
+                <div class="panel-header__copy">
+                  <span class="eyebrow">Exam Types</span>
+                  <h2>Open by format</h2>
+                  <p>Jump into the right filtered list.</p>
+                </div>
+              </div>
+
+              <div class="dashboard-format-list">
+                <a href="/enrollments/my-quizzes?type=quiz">
+                  <span class="status-pill approved">Quiz</span>
+                  <strong>Multiple choice</strong>
+                  <em><%= dashboardExamTypeCounts.quiz %></em>
+                </a>
+                <a href="/enrollments/my-quizzes?type=true-false">
+                  <span class="status-pill approved">True/False</span>
+                  <strong>Concept checks</strong>
+                  <em><%= dashboardExamTypeCounts['true-false'] %></em>
+                </a>
+                <a href="/enrollments/my-quizzes?type=short-answer">
+                  <span class="status-pill pending">Short Answer</span>
+                  <strong>Teacher reviewed</strong>
+                  <em><%= dashboardExamTypeCounts['short-answer'] %></em>
+                </a>
+                <a href="/enrollments/my-quizzes?type=coding-test">
+                  <span class="status-pill approved">Coding</span>
+                  <strong>Coding tests</strong>
+                  <em><%= dashboardExamTypeCounts['coding-test'] %></em>
+                </a>
+              </div>
+            </section>
+          </div>
+        </section>
+
+        <section class="dashboard-layer-panel dashboard-layer-panel--details">
+          <div class="dashboard-disclosure-stack">
+            <details class="dashboard-disclosure" open>
+              <summary>
+                <div>
+                  <strong>Score calculation</strong>
+                  <span>Marks, points, and pass records.</span>
+                </div>
+                <i class="fas fa-chevron-down dashboard-disclosure__chevron"></i>
+              </summary>
+
+              <div class="dashboard-disclosure__content">
+                <div class="dashboard-detail-grid">
+                  <% studentScoreNotes.forEach((note) => { %>
+                    <article class="formula-card">
+                      <i class="fas <%= note.icon %>"></i>
+                      <h3><%= note.title %></h3>
+                      <p><%= note.copy %></p>
+                      <strong><%= note.value %></strong>
+                    </article>
+                  <% }) %>
+                </div>
+              </div>
+            </details>
+
+            <details class="dashboard-disclosure">
+              <summary>
+                <div>
+                  <strong>Teacher review flow</strong>
+                  <span>Manual scores appear after review.</span>
+                </div>
+                <i class="fas fa-chevron-down dashboard-disclosure__chevron"></i>
+              </summary>
+
+              <div class="dashboard-disclosure__content">
+                <div class="dashboard-step-grid">
+                  <article class="calculation-step">
+                    <span class="calculation-step__number">1</span>
+                    <div>
+                      <h3>Auto-graded questions score immediately</h3>
+                      <p>Multiple-choice and true/false answers are checked as soon as you submit.</p>
+                    </div>
+                  </article>
+
+                  <article class="calculation-step">
+                    <span class="calculation-step__number">2</span>
+                    <div>
+                      <h3>Manual questions wait for feedback</h3>
+                      <p>Short-answer and coding tasks stay pending until marks or comments are added.</p>
+                    </div>
+                  </article>
+
+                  <article class="calculation-step">
+                    <span class="calculation-step__number">3</span>
+                    <div>
+                      <h3>Finalized results refresh progress</h3>
+                      <p>Average score, points, completion numbers, and leaderboards update from the final percentage.</p>
+                    </div>
+                  </article>
+                </div>
+              </div>
+            </details>
+          </div>
+        </section>
+      </div>
+    </section>
+  </div>
+</section>

@@ -1,0 +1,292 @@
+<% layout('layouts/main') %>
+<%
+  const isExistingQuiz = Boolean(quiz && quiz._id);
+  const quizQuestions = questions || [];
+  const actionWithTab = (url) => {
+    if (!currentTabId) return url;
+    return `${url}${url.includes('?') ? '&' : '?'}tab=${encodeURIComponent(currentTabId)}`;
+  };
+  const lockedType = isExistingQuiz && ['true-false', 'short-answer', 'coding-test'].includes(quiz.examType) ? quiz.examType : null;
+  const startsTrueFalse = lockedType === 'true-false';
+  const startsCoding = lockedType === 'coding-test';
+  const startsManualReview = lockedType === 'short-answer' || lockedType === 'coding-test';
+  const startsMultipleChoice = !lockedType;
+  const totalMarks = quizQuestions.reduce((sum, question) => sum + Number(question.marks || 0), 0);
+%>
+
+<% if (typeof canonicalUrl !== 'undefined' && canonicalUrl) { %>
+  <script>
+    window.history.replaceState({}, '', <%- JSON.stringify(canonicalUrl) %>);
+  </script>
+<% } %>
+
+<section class="page-shell quiz-builder-page">
+  <div class="page-container page-stack">
+    <div class="quiz-builder-hero">
+      <div>
+        <span class="eyebrow">Teacher Studio</span>
+        <h1><%= isExistingQuiz ? 'Build Quiz' : 'Create Quiz' %></h1>
+        <p>
+          Save the exam details once, then add every question from this same workspace.
+          Short-answer and coding exams can include reference answers for students to see after submission.
+        </p>
+      </div>
+      <div class="quiz-builder-hero__actions">
+        <span class="status-pill <%= quiz.status === 'published' ? 'approved' : 'pending' %>">
+          <%= quiz.status === 'published' ? 'Published' : isExistingQuiz ? 'Draft' : 'New draft' %>
+        </span>
+        <a href="/teacher/quizzes" class="btn btn-outline-secondary">Back to Quizzes</a>
+      </div>
+    </div>
+
+    <div class="quiz-builder-grid">
+      <aside class="quiz-builder-card quiz-builder-card--details">
+        <div class="builder-card-heading">
+          <span class="builder-step">1</span>
+          <div>
+            <h2>Quiz Details</h2>
+            <p><%= isExistingQuiz ? 'Update the structure and settings any time.' : 'Create the shell first, then questions unlock on this page.' %></p>
+          </div>
+        </div>
+
+        <form class="quiz-details-form" action="<%= actionWithTab(action) %>" method="POST" enctype="multipart/form-data">
+          <div class="builder-field-grid builder-field-grid--split">
+            <div class="form-field">
+              <label class="form-label" for="examType">Exam type</label>
+              <select id="examType" class="form-select" name="examType">
+                <option value="quiz" <%= (quiz.examType || 'quiz') === 'quiz' ? 'selected' : '' %>>Quiz (Mixed / MCQ)</option>
+                <option value="true-false" <%= quiz.examType === 'true-false' ? 'selected' : '' %>>True / False</option>
+                <option value="short-answer" <%= quiz.examType === 'short-answer' ? 'selected' : '' %>>Short Question</option>
+                <option value="coding-test" <%= quiz.examType === 'coding-test' ? 'selected' : '' %>>Coding Exam</option>
+              </select>
+            </div>
+
+            <div class="form-field">
+              <label class="form-label" for="difficulty">Difficulty</label>
+              <select id="difficulty" class="form-select" name="difficulty">
+                <% ['Easy','Medium','Hard'].forEach((level) => { %>
+                  <option value="<%= level %>" <%= quiz.difficulty === level ? 'selected' : '' %>><%= level %></option>
+                <% }) %>
+              </select>
+            </div>
+          </div>
+
+          <div class="form-field">
+            <label class="form-label" for="quizTitle">Quiz title</label>
+            <input id="quizTitle" class="form-control" name="title" placeholder="Example: Data Structures Midterm" value="<%= quiz.title || '' %>" required>
+          </div>
+
+          <div class="form-field">
+            <label class="form-label" for="quizDescription">Description</label>
+            <textarea id="quizDescription" class="form-control" name="description" rows="4" placeholder="What should students know before starting?"><%= quiz.description || '' %></textarea>
+          </div>
+
+          <div class="form-field">
+            <label class="form-label" for="quizThumbnail">Thumbnail image</label>
+            <% if (quiz.thumbnailUrl) { %>
+              <img class="quiz-thumbnail-preview" src="<%= quiz.thumbnailUrl %>" alt="<%= quiz.title || 'Quiz thumbnail' %> thumbnail">
+            <% } %>
+            <input id="quizThumbnail" class="form-control" type="file" name="thumbnail" accept="image/jpeg,image/png,image/webp">
+            <div class="form-text">Recommended: 1280 x 720 px. JPG, PNG, or WebP up to 5MB.</div>
+          </div>
+
+          <div class="form-field">
+            <label class="form-label" for="quizCategory">Category</label>
+            <input id="quizCategory" class="form-control" name="category" placeholder="Category" value="<%= quiz.category || 'General Knowledge' %>" required>
+          </div>
+
+          <div class="builder-field-grid builder-field-grid--split">
+            <div class="form-field">
+              <label class="form-label" for="duration">Duration minutes</label>
+              <input id="duration" class="form-control" type="number" name="duration" min="1" placeholder="30" value="<%= quiz.duration || '' %>" required>
+            </div>
+
+            <div class="form-field">
+              <label class="form-label" for="passingMarks">Passing %</label>
+              <input id="passingMarks" class="form-control" type="number" name="passingMarks" min="0" max="100" placeholder="50" value="<%= quiz.passingMarks || '' %>" required>
+            </div>
+          </div>
+
+          <button class="btn btn-primary w-100" type="submit">
+            <i class="fas fa-wand-magic-sparkles"></i>
+            <%= isExistingQuiz ? 'Save Details' : 'Create Quiz and Add Questions' %>
+          </button>
+        </form>
+      </aside>
+
+      <main class="quiz-builder-workspace">
+        <div class="builder-stats-row">
+          <article>
+            <span>Questions</span>
+            <strong><%= quizQuestions.length %></strong>
+          </article>
+          <article>
+            <span>Total marks</span>
+            <strong><%= totalMarks %></strong>
+          </article>
+          <article>
+            <span>Exam type</span>
+            <strong><%= quiz.examType ? quiz.examType.replace('-', ' ') : 'not set' %></strong>
+          </article>
+        </div>
+
+        <% if (isExistingQuiz) { %>
+          <section class="quiz-builder-card">
+            <div class="builder-card-heading">
+              <span class="builder-step">2</span>
+              <div>
+                <h2>Add Question</h2>
+                <p>Reference answers for written and coding questions are shown after submission, but marks wait for teacher review.</p>
+              </div>
+            </div>
+
+            <form action="<%= actionWithTab(`/teacher/quizzes/${quiz._id}/questions`) %>" method="POST" class="modern-question-form">
+              <div class="form-field">
+                <label class="form-label fw-semibold mb-1">Question</label>
+                <textarea class="form-control" name="questionText" rows="3" placeholder="Write the full question statement" required></textarea>
+              </div>
+
+              <div class="builder-field-grid builder-field-grid--question">
+                <div class="form-field">
+                  <label class="form-label fw-semibold mb-1" for="questionType">Question type</label>
+                  <select class="form-select question-type" name="type" id="questionType" required>
+                    <% if (!lockedType) { %>
+                      <option value="multiple-choice">Multiple Choice</option>
+                      <option value="true-false">True/False</option>
+                      <option value="short-answer">Short Answer</option>
+                    <% } else if (lockedType === 'true-false') { %>
+                      <option value="true-false">True/False</option>
+                    <% } else if (lockedType === 'short-answer') { %>
+                      <option value="short-answer">Short Answer</option>
+                    <% } else if (lockedType === 'coding-test') { %>
+                      <option value="coding">Coding</option>
+                    <% } %>
+                  </select>
+                </div>
+
+                <div class="form-field">
+                  <label class="form-label fw-semibold mb-1" for="questionMarks">Marks</label>
+                  <input id="questionMarks" class="form-control" type="number" min="1" name="marks" value="1" placeholder="Marks" required>
+                </div>
+              </div>
+
+              <div class="options-box <%= startsMultipleChoice ? '' : 'd-none' %>" id="optionsBox">
+                <label class="form-label fw-semibold mb-2">Options</label>
+                <div class="builder-option-grid">
+                  <input class="form-control" name="options[]" placeholder="Option 1" <%= startsMultipleChoice ? 'required' : 'disabled' %>>
+                  <input class="form-control" name="options[]" placeholder="Option 2" <%= startsMultipleChoice ? 'required' : 'disabled' %>>
+                  <input class="form-control" name="options[]" placeholder="Option 3" <%= startsMultipleChoice ? 'required' : 'disabled' %>>
+                  <input class="form-control" name="options[]" placeholder="Option 4" <%= startsMultipleChoice ? 'required' : 'disabled' %>>
+                </div>
+              </div>
+
+              <div id="correctAnswerGroup" class="<%= startsManualReview ? 'd-none' : '' %>">
+                <label class="form-label fw-semibold mb-1" for="correctAnswerField">Correct option / answer</label>
+                <input class="form-control <%= startsTrueFalse ? 'd-none' : '' %>" id="correctAnswerField" name="correctAnswer" placeholder="Enter the exact correct answer" <%= startsTrueFalse || startsManualReview ? 'disabled' : 'required' %>>
+                <select class="form-select <%= startsTrueFalse ? '' : 'd-none' %>" id="trueFalseAnswerField" name="correctAnswer" <%= startsTrueFalse ? 'required' : 'disabled' %>>
+                  <option value="True">True</option>
+                  <option value="False">False</option>
+                </select>
+                <div class="form-text" id="correctAnswerHelp"><%= startsTrueFalse ? 'Choose the correct truth value.' : 'For multiple choice, this must match one option exactly.' %></div>
+              </div>
+
+              <div id="manualAnswerGroup" class="manual-answer-box <%= startsManualReview ? '' : 'd-none' %>">
+                <label class="form-label fw-semibold mb-1" for="manualCorrectAnswerField">Reference answer shown after submission</label>
+                <textarea
+                  class="form-control"
+                  id="manualCorrectAnswerField"
+                  name="correctAnswer"
+                  rows="<%= startsCoding ? 8 : 4 %>"
+                  placeholder="<%= startsCoding ? 'Paste the reference solution or expected approach' : 'Write the correct or ideal short answer' %>"
+                  <%= startsManualReview ? 'required' : 'disabled' %>></textarea>
+                <div class="form-text">Students can see this after finishing, but their marks remain pending until you review.</div>
+              </div>
+
+              <div id="codingFields" class="<%= startsCoding ? '' : 'd-none' %>">
+                <div class="coding-panel-heading mb-3">
+                  <span class="status-pill pending">Coding setup</span>
+                  <small>Language, starter code, and sample cases</small>
+                </div>
+
+                <label class="form-label">Programming Language</label>
+                <input class="form-control" type="text" name="language" id="language" placeholder="JavaScript, Python, C++, Java" <%= startsCoding ? 'required' : 'disabled' %>>
+
+                <label class="form-label mt-3">Code Template (optional)</label>
+                <textarea class="form-control" name="codeTemplate" id="codeTemplate" rows="4" placeholder="// Starter code template for students" <%= startsCoding ? '' : 'disabled' %>></textarea>
+
+                <label class="form-label mt-3">Sample Cases (optional)</label>
+                <div id="testCasesContainer">
+                  <div class="test-case mb-3">
+                    <textarea class="form-control mb-2" name="testCaseInputs[]" rows="3" placeholder="Sample Input 1" <%= startsCoding ? '' : 'disabled' %>></textarea>
+                    <textarea class="form-control" name="testCaseOutputs[]" rows="2" placeholder="Sample Output 1" <%= startsCoding ? '' : 'disabled' %>></textarea>
+                  </div>
+                </div>
+                <button type="button" class="btn btn-sm btn-outline-secondary" id="addQuizTestCase">+ Add Test Case</button>
+              </div>
+
+              <div id="explanationGroup" class="<%= startsManualReview ? 'd-none' : '' %>">
+                <label class="form-label fw-semibold mb-1" for="explanationField">Explanation</label>
+                <textarea class="form-control" id="explanationField" name="explanation" rows="2" placeholder="Optional explanation shown after auto-graded submission" <%= startsManualReview ? 'disabled' : '' %>></textarea>
+              </div>
+
+              <button class="btn btn-primary" type="submit">
+                <i class="fas fa-plus"></i>
+                Add Question
+              </button>
+            </form>
+          </section>
+
+          <section class="quiz-builder-card">
+            <div class="builder-card-heading">
+              <span class="builder-step">3</span>
+              <div>
+                <h2>Question Stack</h2>
+                <p><%= quizQuestions.length ? 'Review what is already inside this exam.' : 'No questions yet. Add your first one above.' %></p>
+              </div>
+            </div>
+
+            <% if (quizQuestions.length) { %>
+              <div class="builder-question-list">
+                <% quizQuestions.forEach((question, index) => { %>
+                  <article class="question-item">
+                    <div>
+                      <strong><%= index + 1 %>. <%= question.questionText %></strong>
+                      <div class="small text-muted">
+                        <span class="badge bg-secondary me-2"><%= question.type %></span>
+                        <%= question.marks %> mark<%= question.marks === 1 ? '' : 's' %>
+                        <% if (question.type === 'coding') { %>
+                          | <%= question.language || 'Coding' %> | <%= question.testCases ? question.testCases.length : 0 %> sample case<%= question.testCases && question.testCases.length === 1 ? '' : 's' %>
+                        <% } %>
+                        <% if (['short-answer', 'coding'].includes(question.type) && question.correctAnswer) { %>
+                          | Reference answer added
+                        <% } else if (!['short-answer', 'coding'].includes(question.type)) { %>
+                          | Answer: <%= question.correctAnswer || 'N/A' %>
+                        <% } %>
+                        <% if (question.explanation && question.explanation.trim()) { %>
+                          | Explanation added
+                        <% } %>
+                      </div>
+                    </div>
+                    <form action="<%= actionWithTab(`/teacher/quizzes/${quiz._id}/questions/${question._id}?_method=DELETE`) %>" method="POST">
+                      <button class="btn btn-sm btn-outline-danger">Remove</button>
+                    </form>
+                  </article>
+                <% }) %>
+              </div>
+            <% } else { %>
+              <div class="empty-state builder-empty-state">Add a question and it will appear here instantly after saving.</div>
+            <% } %>
+          </section>
+        <% } else { %>
+          <section class="quiz-builder-card quiz-builder-locked">
+            <div class="builder-lock-visual">
+              <i class="fas fa-layer-group"></i>
+            </div>
+            <h2>Questions unlock here</h2>
+            <p>Fill in the details, click <strong>Create Quiz and Add Questions</strong>, and this panel becomes your question builder on the same page.</p>
+          </section>
+        <% } %>
+      </main>
+    </div>
+  </div>
+</section>
