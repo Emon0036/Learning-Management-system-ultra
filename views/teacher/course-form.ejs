@@ -25,11 +25,12 @@
     'recorded-class': 'Recorded class',
     'external-link': 'External link',
     'community-link': 'Community link',
-    'youtube-class': 'YouTube class'
+    'youtube-class': 'YouTube class',
+    'vdocipher-class': 'VdoCipher protected video'
   };
   const materialTypeLabel = (type) => materialLabels[type] || String(type || 'Material').replace(/-/g, ' ');
   const materialIcon = (type) => {
-    if (type === 'youtube-class' || type === 'recorded-class') return 'fa-circle-play';
+    if (type === 'youtube-class' || type === 'recorded-class' || type === 'vdocipher-class') return 'fa-circle-play';
     if (type === 'community-link') return 'fa-users';
     if (type === 'file') return 'fa-file-arrow-down';
     if (type === 'note') return 'fa-note-sticky';
@@ -231,7 +232,7 @@
                         <small><%= materialTypeLabel(material.type) %><% if (material.fileName) { %> - <%= material.fileName %><% } %></small>
                       </div>
                       <div class="curriculum-item__actions">
-                        <% if (material.resourceUrl) { %>
+                        <% if (material.resourceUrl && material.type !== 'vdocipher-class') { %>
                           <a class="icon-button" href="<%= material.resourceUrl %>" target="_blank" rel="noopener" aria-label="Open material"><i class="fas fa-arrow-up-right-from-square"></i></a>
                         <% } %>
                         <form action="<%= actionWithTab(`/teacher/courses/${course._id}/materials/${material._id}?_method=DELETE`) %>" method="POST">
@@ -298,6 +299,7 @@
                       <div class="builder-field-grid builder-field-grid--split">
                         <input class="form-control" name="title" placeholder="Class 01 recorded lecture" required>
                         <select class="form-select" name="type">
+                          <option value="vdocipher-class">VdoCipher protected video</option>
                           <option value="youtube-class">YouTube recorded lecture</option>
                           <option value="recorded-class">Other recorded class link</option>
                           <option value="community-link">Community link</option>
@@ -307,7 +309,7 @@
                         </select>
                       </div>
 
-                      <input class="form-control" name="resourceUrl" placeholder="Paste YouTube, WhatsApp, Drive, Zoom recording, or any link">
+                      <input class="form-control" name="resourceUrl" placeholder="Paste VdoCipher video ID, YouTube URL, Drive/Zoom link, or any resource link">
                       <textarea class="form-control" name="content" rows="2" placeholder="Short note or description"></textarea>
                       <input class="form-control" type="file" name="resourceFile">
                       <button class="btn btn-primary btn-sm" type="submit"><i class="fas fa-plus"></i>Add</button>
@@ -399,12 +401,13 @@
               <input class="form-control" name="title" placeholder="Whatsapp Community / Syllabus / Extra link" required>
               <select class="form-select" name="type">
                 <option value="community-link">Community link</option>
+                <option value="vdocipher-class">VdoCipher protected video</option>
                 <option value="youtube-class">YouTube recorded lecture</option>
                 <option value="file">Upload PDF/file</option>
                 <option value="note">Text note</option>
                 <option value="external-link">External link</option>
               </select>
-              <input class="form-control" name="resourceUrl" placeholder="Paste link">
+              <input class="form-control" name="resourceUrl" placeholder="Paste VdoCipher video ID or link">
               <textarea class="form-control" name="content" rows="2" placeholder="Short note"></textarea>
               <input class="form-control" type="file" name="resourceFile">
               <button class="btn btn-primary btn-sm" type="submit"><i class="fas fa-plus"></i>Add Resource</button>
@@ -422,7 +425,7 @@
                   <small><%= materialTypeLabel(material.type) %><% if (material.fileName) { %> - <%= material.fileName %><% } %></small>
                 </div>
                 <div class="curriculum-item__actions">
-                  <% if (material.resourceUrl) { %>
+                  <% if (material.resourceUrl && material.type !== 'vdocipher-class') { %>
                     <a class="icon-button" href="<%= material.resourceUrl %>" target="_blank" rel="noopener" aria-label="Open resource"><i class="fas fa-arrow-up-right-from-square"></i></a>
                   <% } %>
                   <form action="<%= actionWithTab(`/teacher/courses/${course._id}/materials/${material._id}?_method=DELETE`) %>" method="POST">

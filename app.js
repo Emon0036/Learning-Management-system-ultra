@@ -88,6 +88,20 @@ function configureApp(mongoUri) {
   app.use(express.urlencoded({ extended: true }));
   app.use(express.json());
   app.use(methodOverride('_method'));
+  app.use('/uploads/course-files', (req, res, next) => {
+    if (/\.(mp4|webm|ogg|ogv|mov|m4v)(\?.*)?$/i.test(req.path)) {
+      return res
+        .status(403)
+        .set({
+          'Cache-Control': 'no-store, private, max-age=0',
+          'X-Content-Type-Options': 'nosniff',
+          'Referrer-Policy': 'same-origin',
+        })
+        .type('text/plain')
+        .send('Course videos are protected. Please watch them from the course classroom.');
+    }
+    return next();
+  });
   app.use(express.static(path.join(__dirname, 'public')));
   app.get('/favicon.ico', (req, res) => res.status(204).end());
   app.get('/.well-known/appspecific/com.chrome.devtools.json', (req, res) => res.status(204).end());

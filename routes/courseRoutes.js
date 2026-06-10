@@ -15,6 +15,11 @@ router.get('/:courseId', asyncHandler(courseController.detail));
 router.get('/:courseId/checkout', ensureStudent, asyncHandler(courseController.checkout));
 router.post('/:courseId/purchase', ensureStudent, asyncHandler(courseController.purchase));
 router.get('/:courseId/learn', ensureStudent, asyncHandler(courseController.learn));
+router.post('/:courseId/protection-violation', ensureStudent, asyncHandler(courseController.reportProtectionViolation));
+router.get('/:courseId/materials/:materialId/open', ensureStudent, asyncHandler(courseController.openMaterial));
+router.get('/:courseId/materials/:materialId/vdocipher-player', ensureStudent, asyncHandler(courseController.vdoCipherPlayer));
+router.get('/:courseId/materials/:materialId/stream', ensureStudent, asyncHandler(courseController.streamMaterial));
+router.get('/:courseId/sessions/:sessionId/recording', ensureStudent, asyncHandler(courseController.openSessionRecording));
 router.post('/:courseId/assignments/:assignmentId/submit', ensureStudent, courseFileUpload.assignmentAnswer, asyncHandler(courseController.submitAssignment));
 router.post('/:courseId/lessons/:lessonId/complete', ensureStudent, asyncHandler(courseController.toggleLessonComplete));
 

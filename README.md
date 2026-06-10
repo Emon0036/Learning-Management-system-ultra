@@ -150,6 +150,10 @@ Available variables:
 | `CLOUDINARY_API_KEY` | No | Cloudinary API key |
 | `CLOUDINARY_API_SECRET` | No | Cloudinary API secret |
 | `CLOUDINARY_QUIZ_FOLDER` | No | Override upload folder for thumbnails |
+| `VDOCIPHER_API_SECRET` | Required for VdoCipher playback | VdoCipher API secret used only by the backend to generate OTP playback credentials |
+| `VDOCIPHER_OTP_TTL_SECONDS` | No | VdoCipher OTP lifetime in seconds, defaults to `300` |
+| `VDOCIPHER_API_BASE_URL` | No | Override VdoCipher API base URL, defaults to `https://dev.vdocipher.com/api` |
+| `VDOCIPHER_PLAYER_BASE_URL` | No | Override VdoCipher player URL, defaults to `https://player.vdocipher.com/v2/` |
 | `PISTON_API_URL` | No | Reserved for code-execution integration experiments |
 | `PISTON_HTTP_TIMEOUT_MS` | No | Reserved timeout for code-execution integration |
 

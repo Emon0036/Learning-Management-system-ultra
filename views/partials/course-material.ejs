@@ -5,12 +5,24 @@
     'recorded-class': 'Recorded class',
     'external-link': 'External link',
     'community-link': 'Community link',
-    'youtube-class': 'YouTube class'
+    'youtube-class': 'YouTube class',
+    'vdocipher-class': 'VdoCipher protected video'
   };
   const materialTypeLabel = materialLabels[material.type] || String(material.type || 'Material').replace(/-/g, ' ');
   const materialUrl = String(material.resourceUrl || '').trim();
+  const materialCourseId = String(material.course && material.course._id ? material.course._id : material.course || '');
+  const materialId = String(material._id || material.id || '');
+  const shouldProtectMaterialLinks = typeof protectMaterialLinks !== 'undefined' && protectMaterialLinks;
+  const protectedOpenUrl = materialCourseId && materialId ? `/courses/${materialCourseId}/materials/${materialId}/open` : '';
+  const protectedStreamUrl = materialCourseId && materialId ? `/courses/${materialCourseId}/materials/${materialId}/stream` : '';
+  const materialActionUrl = shouldProtectMaterialLinks && protectedOpenUrl ? protectedOpenUrl : materialUrl;
+  const watermarkText = typeof courseProtectionWatermark !== 'undefined' ? String(courseProtectionWatermark || '') : '';
+  const vdoCipherPlayerUrl = material.type === 'vdocipher-class' && materialCourseId && materialId
+    ? `/courses/${materialCourseId}/materials/${materialId}/vdocipher-player`
+    : '';
   let youtubeEmbedUrl = '';
   let directVideoUrl = '';
+  let hasDirectVideo = false;
 
   if (materialUrl) {
     try {
@@ -26,16 +38,27 @@
         if (pathParts[0] === 'embed' || pathParts[0] === 'shorts') youtubeId = pathParts[1] || '';
       }
 
-      if (youtubeId) youtubeEmbedUrl = `https://www.youtube-nocookie.com/embed/${youtubeId}?rel=0&modestbranding=1&playsinline=1`;
+      if (youtubeId) {
+        const youtubeParams = new URLSearchParams({
+          rel: '0',
+          modestbranding: '1',
+          playsinline: '1',
+          iv_load_policy: '3',
+          disablekb: '1',
+          fs: '0',
+        });
+        youtubeEmbedUrl = `https://www.youtube-nocookie.com/embed/${youtubeId}?${youtubeParams.toString()}`;
+      }
     } catch {}
 
-    if (/\.(mp4|webm|ogg)(\?.*)?$/i.test(materialUrl)) {
-      directVideoUrl = materialUrl;
+    if (/\.(mp4|webm|ogg|ogv|mov|m4v)(\?.*)?$/i.test(materialUrl)) {
+      hasDirectVideo = true;
+      directVideoUrl = shouldProtectMaterialLinks && protectedStreamUrl ? protectedStreamUrl : materialUrl;
     }
   }
 
-  const isVideoMaterial = ['youtube-class', 'recorded-class'].includes(material.type);
-  const hasEmbeddedVideo = isVideoMaterial && (youtubeEmbedUrl || directVideoUrl);
+  const isVideoMaterial = ['youtube-class', 'recorded-class', 'vdocipher-class'].includes(material.type) || hasDirectVideo;
+  const hasEmbeddedVideo = isVideoMaterial && (youtubeEmbedUrl || directVideoUrl || vdoCipherPlayerUrl);
   const hideVideoLink = isVideoMaterial && typeof hideVideoExternalLink !== 'undefined' && hideVideoExternalLink;
 %>
 <article class="course-material-row course-material-row--student <%= hasEmbeddedVideo ? 'course-material-row--video' : '' %> <%= hideVideoLink ? 'course-material-row--quiet-video' : '' %>">
@@ -55,26 +78,51 @@
   </div>
 
   <% if (youtubeEmbedUrl && isVideoMaterial) { %>
-    <div class="course-video-player">
+    <div class="course-video-player course-video-player--protected" data-watermark="<%= watermarkText %>">
       <iframe
         src="<%= youtubeEmbedUrl %>"
         title="<%= material.title %> video"
         loading="lazy"
         referrerpolicy="strict-origin-when-cross-origin"
         sandbox="allow-scripts allow-same-origin allow-presentation"
-        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+        allow="accelerometer; autoplay; encrypted-media; gyroscope; picture-in-picture"
+      ></iframe>
+      <% if (watermarkText) { %>
+        <span class="course-video-watermark course-video-watermark--primary"><%= watermarkText %></span>
+        <span class="course-video-watermark course-video-watermark--ghost"><%= watermarkText %></span>
+      <% } %>
+    </div>
+  <% } else if (vdoCipherPlayerUrl && isVideoMaterial) { %>
+    <div class="course-video-player course-video-player--protected" data-watermark="<%= watermarkText %>">
+      <iframe
+        src="<%= vdoCipherPlayerUrl %>"
+        title="<%= material.title %> protected video"
+        loading="lazy"
+        referrerpolicy="strict-origin-when-cross-origin"
+        allow="encrypted-media; fullscreen; picture-in-picture"
         allowfullscreen
       ></iframe>
     </div>
   <% } else if (directVideoUrl && isVideoMaterial) { %>
-    <div class="course-video-player">
-      <video controls preload="metadata" src="<%= directVideoUrl %>"></video>
+    <div class="course-video-player course-video-player--protected" data-watermark="<%= watermarkText %>">
+      <video
+        controls
+        controlsList="nodownload noplaybackrate noremoteplayback"
+        disablepictureinpicture
+        playsinline
+        preload="metadata"
+        src="<%= directVideoUrl %>"
+      ></video>
+      <% if (watermarkText) { %>
+        <span class="course-video-watermark course-video-watermark--primary"><%= watermarkText %></span>
+        <span class="course-video-watermark course-video-watermark--ghost"><%= watermarkText %></span>
+      <% } %>
     </div>
   <% } %>
 
-  <% if (materialUrl && !hideVideoLink) { %>
+  <% if (materialActionUrl && !hideVideoLink) { %>
     <div class="course-material-row__actions">
-      <a class="btn btn-sm btn-outline-primary" href="<%= materialUrl %>" target="_blank" rel="noopener">
+      <a class="btn btn-sm btn-outline-primary" href="<%= materialActionUrl %>" target="_blank" rel="noopener">
         <i class="fas fa-arrow-up-right-from-square"></i>
         <%= hasEmbeddedVideo ? 'Open video' : 'Open' %>
       </a>

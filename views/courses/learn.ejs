@@ -2,7 +2,7 @@
 <%
   const courseAssignments = assignments || [];
   const assignmentSubmissions = assignmentSubmissionByAssignment || new Map();
-  const videoMaterialTypes = new Set(['youtube-class', 'recorded-class']);
+  const videoMaterialTypes = new Set(['youtube-class', 'recorded-class', 'vdocipher-class']);
   const courseLessons = lessons || [];
   const currentLesson = courseLessons.find((lesson) => !completedLessonIds.has(String(lesson._id))) || courseLessons[0] || null;
   const formatDurationFromSeconds = (value) => {
@@ -14,7 +14,11 @@
   };
   const formatDurationFromMinutes = (value) => formatDurationFromSeconds(Number(value || 0) * 60);
 %>
-<section class="page-shell course-classroom-page">
+<section
+  class="page-shell course-classroom-page"
+  data-protected-course="true"
+  data-protection-report-url="/courses/<%= course._id %>/protection-violation"
+>
   <div class="page-container page-stack">
     <div class="page-heading course-study-heading">
       <div>
@@ -73,7 +77,7 @@
               </div>
               <div class="course-study-support-list">
                 <% courseLevelMaterials.forEach((material) => { %>
-                  <%- include('../partials/course-material', { material, hideVideoExternalLink: true }) %>
+                  <%- include('../partials/course-material', { material, hideVideoExternalLink: true, protectMaterialLinks: true, courseProtectionWatermark }) %>
                 <% }) %>
               </div>
             </section>
@@ -106,7 +110,7 @@
               <% if (videoMaterials.length) { %>
                 <div class="course-video-stack" aria-label="Class videos">
                   <% videoMaterials.forEach((material) => { %>
-                    <%- include('../partials/course-material', { material, hideVideoExternalLink: true }) %>
+                    <%- include('../partials/course-material', { material, hideVideoExternalLink: true, protectMaterialLinks: true, courseProtectionWatermark }) %>
                   <% }) %>
                 </div>
               <% } else { %>
@@ -114,7 +118,7 @@
                   <i class="fas fa-video-slash"></i>
                   <div>
                     <strong>No class video has been added yet</strong>
-                    <span>Ask the teacher to add a YouTube or recorded-class material to this section.</span>
+                    <span>Ask the teacher to add a VdoCipher, YouTube, or recorded-class material to this section.</span>
                   </div>
                 </div>
               <% } %>
@@ -124,7 +128,7 @@
                   <% if (supportMaterials.length) { %>
                     <div class="course-study-support-list">
                       <% supportMaterials.forEach((material) => { %>
-                        <%- include('../partials/course-material', { material, hideVideoExternalLink: true }) %>
+                        <%- include('../partials/course-material', { material, hideVideoExternalLink: true, protectMaterialLinks: true, courseProtectionWatermark }) %>
                       <% }) %>
                     </div>
                   <% } %>
@@ -280,7 +284,7 @@
                   <a class="btn btn-sm btn-primary" href="<%= session.meetingUrl %>" target="_blank" rel="noopener">Join Session</a>
                 <% } %>
                 <% if (session.recordingUrl) { %>
-                  <a class="btn btn-sm btn-outline-primary" href="<%= session.recordingUrl %>" target="_blank" rel="noopener">Recording</a>
+                  <a class="btn btn-sm btn-outline-primary" href="/courses/<%= course._id %>/sessions/<%= session._id %>/recording" target="_blank" rel="noopener">Recording</a>
                 <% } %>
               </div>
             </article>

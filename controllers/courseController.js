@@ -1,6 +1,10 @@
 const crypto = require('crypto');
+const fsSync = require('fs');
 const fs = require('fs/promises');
+const net = require('net');
 const path = require('path');
+const axios = require('axios');
+const dns = require('dns').promises;
 const Course = require('../models/Course');
 const CourseLesson = require('../models/CourseLesson');
 const CourseMaterial = require('../models/CourseMaterial');
@@ -12,14 +16,299 @@ const CourseEnrollment = require('../models/CourseEnrollment');
 const Quiz = require('../models/Quiz');
 const QuizEnrollment = require('../models/Enrollment');
 const Progress = require('../models/Progress');
+const { removeTabUser } = require('../middleware/tabSessionMiddleware');
 
 const COURSE_LEVELS = ['Beginner', 'Intermediate', 'Advanced'];
-const MATERIAL_TYPES = ['note', 'file', 'recorded-class', 'external-link', 'community-link', 'youtube-class'];
+const MATERIAL_TYPES = ['note', 'file', 'recorded-class', 'external-link', 'community-link', 'youtube-class', 'vdocipher-class'];
 const SESSION_STATUSES = ['scheduled', 'completed', 'cancelled'];
+const VIDEO_MATERIAL_TYPES = new Set(['recorded-class', 'youtube-class', 'vdocipher-class']);
+const DIRECT_VIDEO_EXTENSIONS = new Set(['.mp4', '.webm', '.ogg', '.ogv', '.mov', '.m4v']);
 const uploadDir = path.join(__dirname, '..', 'public', 'uploads', 'course-files');
+const VDOCIPHER_API_BASE_URL = process.env.VDOCIPHER_API_BASE_URL || 'https://dev.vdocipher.com/api';
+const VDOCIPHER_PLAYER_BASE_URL = process.env.VDOCIPHER_PLAYER_BASE_URL || 'https://player.vdocipher.com/v2/';
+const VDOCIPHER_OTP_TTL_SECONDS = Math.max(60, safeNumber(process.env.VDOCIPHER_OTP_TTL_SECONDS, 300));
 
 function cleanText(value) {
   return String(value || '').trim();
+}
+
+function safeNumber(value, fallback = 0) {
+  const number = Number(value);
+  return Number.isFinite(number) ? number : fallback;
+}
+
+function normalizeVdoCipherVideoId(value) {
+  const rawValue = cleanText(value);
+  if (!rawValue) return '';
+
+  try {
+    const parsedUrl = new URL(rawValue);
+    const pathParts = parsedUrl.pathname.split('/').filter(Boolean);
+    const videoIndex = pathParts.findIndex((part) => ['videos', 'video'].includes(part.toLowerCase()));
+    if (videoIndex > -1 && pathParts[videoIndex + 1]) return pathParts[videoIndex + 1].trim();
+    if (parsedUrl.searchParams.get('videoId')) return parsedUrl.searchParams.get('videoId').trim();
+    if (parsedUrl.searchParams.get('id')) return parsedUrl.searchParams.get('id').trim();
+  } catch {}
+
+  return rawValue;
+}
+
+function isValidVdoCipherVideoId(value) {
+  return /^[a-zA-Z0-9_-]{6,128}$/.test(normalizeVdoCipherVideoId(value));
+}
+
+async function getVdoCipherPlayback(videoId) {
+  const apiSecret = process.env.VDOCIPHER_API_SECRET;
+  if (!apiSecret) {
+    throw new Error('VDOCIPHER_API_SECRET is not configured.');
+  }
+
+  const response = await axios.post(
+    `${VDOCIPHER_API_BASE_URL.replace(/\/+$/g, '')}/videos/${encodeURIComponent(videoId)}/otp`,
+    { ttl: VDOCIPHER_OTP_TTL_SECONDS },
+    {
+      headers: {
+        Accept: 'application/json',
+        'Content-Type': 'application/json',
+        Authorization: `Apisecret ${apiSecret}`,
+      },
+      timeout: Number(process.env.VDOCIPHER_API_TIMEOUT_MS) || 12000,
+    }
+  );
+
+  if (!response.data?.otp || !response.data?.playbackInfo) {
+    throw new Error('VdoCipher did not return playback credentials.');
+  }
+
+  return {
+    otp: String(response.data.otp),
+    playbackInfo: String(response.data.playbackInfo),
+  };
+}
+
+function isDirectVideoPath(value) {
+  try {
+    const parsedUrl = new URL(value, 'https://quizmaster.local');
+    return DIRECT_VIDEO_EXTENSIONS.has(path.extname(parsedUrl.pathname).toLowerCase());
+  } catch {
+    return DIRECT_VIDEO_EXTENSIONS.has(path.extname(cleanText(value)).toLowerCase());
+  }
+}
+
+function isVideoUpload(file) {
+  return Boolean(file && (String(file.mimetype || '').startsWith('video/') || isDirectVideoPath(file.originalname)));
+}
+
+function isSafeResourceUrl(resourceUrl) {
+  if (!resourceUrl) return true;
+  if (resourceUrl.startsWith('/')) return resourceUrl.startsWith('/uploads/course-files/');
+
+  try {
+    const parsedUrl = new URL(resourceUrl);
+    return parsedUrl.protocol === 'https:' || parsedUrl.protocol === 'http:';
+  } catch {
+    return false;
+  }
+}
+
+function getVideoContentType(filePath, fallback = '') {
+  if (fallback && fallback.startsWith('video/')) return fallback;
+
+  const extension = path.extname(filePath).toLowerCase();
+  if (extension === '.webm') return 'video/webm';
+  if (extension === '.ogg' || extension === '.ogv') return 'video/ogg';
+  if (extension === '.mov') return 'video/quicktime';
+  return 'video/mp4';
+}
+
+function getFileContentType(filePath, fallback = '') {
+  if (fallback) return fallback;
+
+  const extension = path.extname(filePath).toLowerCase();
+  if (extension === '.pdf') return 'application/pdf';
+  if (extension === '.txt') return 'text/plain; charset=utf-8';
+  if (extension === '.jpg' || extension === '.jpeg') return 'image/jpeg';
+  if (extension === '.png') return 'image/png';
+  if (extension === '.webp') return 'image/webp';
+  return 'application/octet-stream';
+}
+
+function isPrivateIpAddress(address) {
+  if (!address) return true;
+
+  if (net.isIPv6(address)) {
+    const normalized = address.toLowerCase();
+    return (
+      normalized === '::1' ||
+      normalized === '::' ||
+      normalized.startsWith('fc') ||
+      normalized.startsWith('fd') ||
+      normalized.startsWith('fe80:')
+    );
+  }
+
+  if (!net.isIPv4(address)) return true;
+
+  const parts = address.split('.').map((part) => Number(part));
+  const [first, second] = parts;
+  return (
+    first === 10 ||
+    first === 127 ||
+    first === 0 ||
+    first === 169 && second === 254 ||
+    first === 172 && second >= 16 && second <= 31 ||
+    first === 192 && second === 168
+  );
+}
+
+async function assertPublicHttpUrl(rawUrl) {
+  const parsedUrl = new URL(rawUrl);
+  if (!['http:', 'https:'].includes(parsedUrl.protocol)) {
+    throw new Error('Only HTTP and HTTPS video links can be streamed.');
+  }
+
+  const hostname = parsedUrl.hostname.toLowerCase();
+  if (hostname === 'localhost' || hostname.endsWith('.localhost')) {
+    throw new Error('Local video links cannot be proxied.');
+  }
+
+  const addresses = await dns.lookup(hostname, { all: true });
+  if (!addresses.length || addresses.some((item) => isPrivateIpAddress(item.address))) {
+    throw new Error('Private video links cannot be proxied.');
+  }
+}
+
+function resolveLocalCourseFile(resourceUrl) {
+  if (!resourceUrl || !resourceUrl.startsWith('/uploads/course-files/')) return '';
+
+  const filePath = path.resolve(path.join(__dirname, '..', 'public', resourceUrl));
+  const resolvedUploadDir = path.resolve(uploadDir);
+  if (!filePath.startsWith(`${resolvedUploadDir}${path.sep}`)) return '';
+  return filePath;
+}
+
+function setProtectedContentHeaders(res) {
+  res.set({
+    'Cache-Control': 'no-store, private, max-age=0',
+    Pragma: 'no-cache',
+    'X-Content-Type-Options': 'nosniff',
+    'X-Frame-Options': 'DENY',
+    'Referrer-Policy': 'same-origin',
+    'X-Robots-Tag': 'noindex, nofollow, noarchive',
+    'Cross-Origin-Resource-Policy': 'same-origin',
+    'Permissions-Policy': 'display-capture=(), camera=(), microphone=()',
+  });
+}
+
+function setProtectedFrameHeaders(res) {
+  res.set({
+    'Cache-Control': 'no-store, private, max-age=0',
+    Pragma: 'no-cache',
+    'X-Content-Type-Options': 'nosniff',
+    'X-Frame-Options': 'SAMEORIGIN',
+    'Referrer-Policy': 'same-origin',
+    'X-Robots-Tag': 'noindex, nofollow, noarchive',
+    'Cross-Origin-Resource-Policy': 'same-origin',
+    'Permissions-Policy': 'display-capture=(), camera=(), microphone=()',
+    'Content-Security-Policy': "default-src 'self'; frame-src https://player.vdocipher.com; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; connect-src 'self';",
+  });
+}
+
+function logoutTabAfterProtectionViolation(req, res, next, responsePayload) {
+  const tabId = req.body.tab || req.query.tab || req.currentTabId;
+  removeTabUser(req, tabId);
+  req.flash('error', 'Protected course access ended because piracy behavior was detected.');
+
+  const remainingTabIds = req.session?.tabUsers ? Object.keys(req.session.tabUsers) : [];
+  if (!remainingTabIds.length && typeof req.logout === 'function') {
+    return req.logout((error) => {
+      if (error) return next(error);
+      return res.status(403).json(responsePayload);
+    });
+  }
+
+  if (req.session && req.session.passport && !req.session.passport.user && remainingTabIds.length) {
+    req.session.passport.user = req.session.tabUsers[remainingTabIds[0]];
+  }
+
+  return res.status(403).json(responsePayload);
+}
+
+async function streamLocalVideo(req, res, material, filePath) {
+  const stats = await fs.stat(filePath);
+  const totalSize = stats.size;
+  const contentType = getVideoContentType(filePath, material.fileMimeType);
+  const range = req.headers.range;
+
+  setProtectedContentHeaders(res);
+  res.set({
+    'Accept-Ranges': 'bytes',
+    'Content-Type': contentType,
+    'Content-Disposition': 'inline',
+  });
+
+  if (!range) {
+    res.set('Content-Length', totalSize);
+    return fsSync.createReadStream(filePath).pipe(res);
+  }
+
+  const match = range.match(/^bytes=(\d*)-(\d*)$/);
+  if (!match) return res.status(416).end();
+
+  const start = match[1] ? Number(match[1]) : 0;
+  const end = match[2] ? Number(match[2]) : totalSize - 1;
+  if (!Number.isFinite(start) || !Number.isFinite(end) || start > end || start >= totalSize) {
+    res.set('Content-Range', `bytes */${totalSize}`);
+    return res.status(416).end();
+  }
+
+  res.status(206).set({
+    'Content-Range': `bytes ${start}-${end}/${totalSize}`,
+    'Content-Length': end - start + 1,
+  });
+  return fsSync.createReadStream(filePath, { start, end }).pipe(res);
+}
+
+async function sendLocalCourseFile(res, material, filePath) {
+  await fs.stat(filePath);
+  setProtectedContentHeaders(res);
+  res.set({
+    'Content-Type': getFileContentType(filePath, material.fileMimeType),
+    'Content-Disposition': `inline; filename="${encodeURIComponent(material.fileName || path.basename(filePath))}"`,
+  });
+  return res.sendFile(filePath);
+}
+
+async function streamRemoteVideo(req, res, material) {
+  await assertPublicHttpUrl(material.resourceUrl);
+
+  const upstream = await axios.get(material.resourceUrl, {
+    responseType: 'stream',
+    headers: req.headers.range ? { Range: req.headers.range } : {},
+    maxRedirects: 0,
+    timeout: Number(process.env.COURSE_VIDEO_PROXY_TIMEOUT_MS) || 12000,
+    validateStatus: (status) => (status >= 200 && status < 300) || status === 416,
+  });
+
+  setProtectedContentHeaders(res);
+  res.status(upstream.status);
+  ['content-type', 'content-length', 'content-range', 'accept-ranges'].forEach((header) => {
+    if (upstream.headers[header]) res.set(header, upstream.headers[header]);
+  });
+  if (!res.get('Content-Type')) res.set('Content-Type', getVideoContentType(material.resourceUrl, material.fileMimeType));
+  res.set('Content-Disposition', 'inline');
+
+  upstream.data.on('error', () => res.end());
+  return upstream.data.pipe(res);
+}
+
+function isStreamableVideoMaterial(material) {
+  if (!material) return false;
+  return material.type !== 'vdocipher-class' && (
+    VIDEO_MATERIAL_TYPES.has(material.type) ||
+    isDirectVideoPath(material.resourceUrl) ||
+    String(material.fileMimeType || '').startsWith('video/')
+  );
 }
 
 function splitLines(value) {
@@ -27,11 +316,6 @@ function splitLines(value) {
     .split(/\r?\n/)
     .map((item) => item.trim())
     .filter(Boolean);
-}
-
-function safeNumber(value, fallback = 0) {
-  const number = Number(value);
-  return Number.isFinite(number) ? number : fallback;
 }
 
 function buildCurrency(value) {
@@ -532,9 +816,19 @@ exports.createMaterial = async (req, res) => {
   const lessonId = cleanText(req.body.lesson);
   const content = cleanText(req.body.content);
   const resourceUrl = cleanText(req.body.resourceUrl);
+  const uploadedFileIsVideo = isVideoUpload(req.file);
+  const storedType = uploadedFileIsVideo ? 'recorded-class' : type;
 
   if (!title) {
     return redirectWithMaterialError(req, res, course, 'Material title is required.');
+  }
+
+  if (storedType === 'vdocipher-class' && !isValidVdoCipherVideoId(resourceUrl)) {
+    return redirectWithMaterialError(req, res, course, 'Add a valid VdoCipher video ID for this material.');
+  }
+
+  if (storedType !== 'vdocipher-class' && !isSafeResourceUrl(resourceUrl)) {
+    return redirectWithMaterialError(req, res, course, 'Use a valid HTTP, HTTPS, or course upload URL.');
   }
 
   let lesson = null;
@@ -545,32 +839,37 @@ exports.createMaterial = async (req, res) => {
     }
   }
 
-  if (type === 'note' && !content) {
+  if (storedType === 'note' && !content) {
     return redirectWithMaterialError(req, res, course, 'Write note content before saving.');
   }
 
-  if (type === 'file' && !req.file) {
+  if (storedType === 'file' && !req.file) {
     return redirectWithMaterialError(req, res, course, 'Choose a file to upload.');
   }
 
-  if (['recorded-class', 'external-link', 'community-link', 'youtube-class'].includes(type) && !resourceUrl) {
+  if (['recorded-class', 'external-link', 'community-link', 'youtube-class', 'vdocipher-class'].includes(storedType) && !resourceUrl && !uploadedFileIsVideo) {
     return redirectWithMaterialError(req, res, course, 'Add a resource URL for this material.');
   }
 
-  if (type !== 'file' && req.file) {
+  if (storedType !== 'file' && !uploadedFileIsVideo && req.file) {
     await removeLocalCourseFile(`/uploads/course-files/${req.file.filename}`);
   }
 
+  const uploadedFilePayload = req.file && (storedType === 'file' || uploadedFileIsVideo)
+    ? buildUploadedFilePayload(req.file)
+    : {};
   const nextPosition = (await CourseMaterial.countDocuments({ course: course._id })) + 1;
   await CourseMaterial.create({
     course: course._id,
     teacher: req.user._id,
     lesson: lesson ? lesson._id : undefined,
     title,
-    type,
+    type: storedType,
     content,
-    resourceUrl,
-    ...(type === 'file' ? buildUploadedFilePayload(req.file) : {}),
+    resourceUrl: storedType === 'vdocipher-class'
+      ? normalizeVdoCipherVideoId(resourceUrl)
+      : resourceUrl || uploadedFilePayload.resourceUrl || '',
+    ...uploadedFilePayload,
     position: Math.max(1, safeNumber(req.body.position, nextPosition)),
   });
 
@@ -985,6 +1284,7 @@ exports.learn = async (req, res) => {
   enrollment.lastAccessedAt = new Date();
   await enrollment.save();
 
+  setProtectedContentHeaders(res);
   res.render('courses/learn', {
     title: `${course.title} Classroom`,
     course,
@@ -996,7 +1296,145 @@ exports.learn = async (req, res) => {
     materialsByLesson: materialsByLesson(materials),
     assignmentSubmissionByAssignment: new Map(assignmentSubmissions.map((submission) => [String(submission.assignment), submission])),
     completedLessonIds: new Set((enrollment.completedLessons || []).map((lessonId) => String(lessonId))),
+    protectedCourseMode: true,
+    courseProtectionWatermark: `${req.user.name || 'Student'} | ${req.user.email || req.user._id} | ${course.title}`,
   });
+};
+
+// Student: terminate protected classroom access after a detected piracy action.
+exports.reportProtectionViolation = async (req, res, next) => {
+  const enrollment = await getStudentCourseEnrollment(req.user._id, req.params.courseId);
+  if (!enrollment) {
+    return res.status(403).json({ redirect: '/auth/login', message: 'Course access is required.' });
+  }
+
+  const reason = cleanText(req.body.reason).slice(0, 120) || 'protected content violation';
+  console.warn(
+    `Protected course violation: user=${req.user._id} course=${req.params.courseId} reason=${reason}`
+  );
+
+  return logoutTabAfterProtectionViolation(req, res, next, {
+    redirect: '/auth/login',
+    message: 'Protected course access ended because piracy behavior was detected.',
+  });
+};
+
+// Student: open a protected course material after confirming course ownership.
+exports.openMaterial = async (req, res) => {
+  const enrollment = await getStudentCourseEnrollment(req.user._id, req.params.courseId);
+  if (!enrollment) {
+    req.flash('error', 'Buy the course first to access this material.');
+    return res.redirect(`/courses/${req.params.courseId}`);
+  }
+
+  const material = await CourseMaterial.findOne({ _id: req.params.materialId, course: req.params.courseId });
+  if (!material) {
+    req.flash('error', 'Course material not found.');
+    return res.redirect(`/courses/${req.params.courseId}/learn`);
+  }
+
+  if (material.type === 'vdocipher-class') {
+    return res.redirect(`/courses/${req.params.courseId}/materials/${material._id}/vdocipher-player`);
+  }
+
+  if (isStreamableVideoMaterial(material)) {
+    return res.redirect(`/courses/${req.params.courseId}/materials/${material._id}/stream`);
+  }
+
+  const localFilePath = resolveLocalCourseFile(material.resourceUrl);
+  if (localFilePath) {
+    return sendLocalCourseFile(res, material, localFilePath);
+  }
+
+  if (!material.resourceUrl || !isSafeResourceUrl(material.resourceUrl) || material.resourceUrl.startsWith('/')) {
+    req.flash('error', 'This material is not available.');
+    return res.redirect(`/courses/${req.params.courseId}/learn`);
+  }
+
+  setProtectedContentHeaders(res);
+  return res.redirect(material.resourceUrl);
+};
+
+// Student: render a short-lived VdoCipher DRM iframe after course ownership is confirmed.
+exports.vdoCipherPlayer = async (req, res) => {
+  const enrollment = await getStudentCourseEnrollment(req.user._id, req.params.courseId);
+  if (!enrollment) {
+    return res.status(403).send('Buy the course first to watch this video.');
+  }
+
+  const material = await CourseMaterial.findOne({
+    _id: req.params.materialId,
+    course: req.params.courseId,
+    type: 'vdocipher-class',
+  });
+
+  if (!material || !isValidVdoCipherVideoId(material.resourceUrl)) {
+    return res.status(404).send('VdoCipher video material not found.');
+  }
+
+  try {
+    const playback = await getVdoCipherPlayback(normalizeVdoCipherVideoId(material.resourceUrl));
+    const playerUrl = new URL(VDOCIPHER_PLAYER_BASE_URL);
+    playerUrl.searchParams.set('otp', playback.otp);
+    playerUrl.searchParams.set('playbackInfo', playback.playbackInfo);
+
+    setProtectedFrameHeaders(res);
+    return res.render('courses/vdocipher-player', {
+      title: material.title,
+      playerUrl: playerUrl.toString(),
+      watermarkText: `${req.user.name || 'Student'} | ${req.user.email || req.user._id} | ${material.title}`,
+    });
+  } catch (error) {
+    console.warn(`VdoCipher playback failed for material ${material._id}: ${error.message}`);
+    return res.status(502).send('The protected VdoCipher player is unavailable right now.');
+  }
+};
+
+// Student: stream protected recorded class videos without exposing local upload paths.
+exports.streamMaterial = async (req, res) => {
+  const enrollment = await getStudentCourseEnrollment(req.user._id, req.params.courseId);
+  if (!enrollment) {
+    return res.status(403).send('Buy the course first to watch this video.');
+  }
+
+  const material = await CourseMaterial.findOne({ _id: req.params.materialId, course: req.params.courseId });
+  if (!material || !isStreamableVideoMaterial(material)) {
+    return res.status(404).send('Video material not found.');
+  }
+
+  const localFilePath = resolveLocalCourseFile(material.resourceUrl);
+  if (localFilePath) {
+    return streamLocalVideo(req, res, material, localFilePath);
+  }
+
+  if (!material.resourceUrl || !isSafeResourceUrl(material.resourceUrl) || !isDirectVideoPath(material.resourceUrl)) {
+    return res.status(404).send('This video can only be watched from the classroom player.');
+  }
+
+  try {
+    return await streamRemoteVideo(req, res, material);
+  } catch (error) {
+    console.warn(`Protected video proxy failed for material ${material._id}: ${error.message}`);
+    return res.status(502).send('The protected video stream is unavailable right now.');
+  }
+};
+
+// Student: open a class recording link only after course ownership is confirmed.
+exports.openSessionRecording = async (req, res) => {
+  const enrollment = await getStudentCourseEnrollment(req.user._id, req.params.courseId);
+  if (!enrollment) {
+    req.flash('error', 'Buy the course first to access this recording.');
+    return res.redirect(`/courses/${req.params.courseId}`);
+  }
+
+  const session = await CourseSession.findOne({ _id: req.params.sessionId, course: req.params.courseId });
+  if (!session || !session.recordingUrl || !isSafeResourceUrl(session.recordingUrl) || session.recordingUrl.startsWith('/')) {
+    req.flash('error', 'Recording is not available.');
+    return res.redirect(`/courses/${req.params.courseId}/learn`);
+  }
+
+  setProtectedContentHeaders(res);
+  return res.redirect(session.recordingUrl);
 };
 
 // Student: upload or replace the answer PDF for a course assignment before the deadline.

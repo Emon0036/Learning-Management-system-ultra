@@ -1,6 +1,6 @@
 const mongoose = require('mongoose');
 
-// Materials hold notes, community links, recorded class links, external resources, and uploaded course files.
+// Materials hold notes, community links, protected videos, external resources, and uploaded course files.
 const courseMaterialSchema = new mongoose.Schema(
   {
     course: { type: mongoose.Schema.Types.ObjectId, ref: 'Course', required: true },
@@ -9,7 +9,7 @@ const courseMaterialSchema = new mongoose.Schema(
     title: { type: String, required: true, trim: true, maxlength: 180 },
     type: {
       type: String,
-      enum: ['note', 'file', 'recorded-class', 'external-link', 'community-link', 'youtube-class'],
+      enum: ['note', 'file', 'recorded-class', 'external-link', 'community-link', 'youtube-class', 'vdocipher-class'],
       required: true,
       default: 'note',
     },

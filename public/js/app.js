@@ -195,6 +195,131 @@
   });
 })();
 
+(function initProtectedCoursePlayback() {
+  const protectedCourse = document.querySelector('[data-protected-course="true"]');
+  if (!protectedCourse) return;
+
+  const blockedCtrlKeys = new Set(['s', 'p', 'u']);
+  const blockedDevKeys = new Set(['i', 'j', 'c']);
+  const protectedPlayers = Array.from(protectedCourse.querySelectorAll('.course-video-player--protected'));
+  const watermarkNodes = Array.from(protectedCourse.querySelectorAll('.course-video-watermark'));
+  const reportUrl = protectedCourse.dataset.protectionReportUrl || '';
+  let violationInProgress = false;
+
+  function kickOutForViolation(reason) {
+    if (violationInProgress) return;
+    violationInProgress = true;
+
+    const redirectToLogin = (url) => {
+      window.location.assign(url || '/auth/login');
+    };
+
+    if (!reportUrl || typeof window.fetch !== 'function') {
+      redirectToLogin('/auth/login');
+      return;
+    }
+
+    window.fetch(reportUrl, {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ reason }),
+      keepalive: true,
+    })
+      .then((response) => response.json().catch(() => ({})))
+      .then((payload) => redirectToLogin(payload.redirect))
+      .catch(() => redirectToLogin('/auth/login'));
+  }
+
+  protectedCourse.addEventListener('contextmenu', (event) => {
+    if (event.target.closest('.course-video-player')) {
+      event.preventDefault();
+      kickOutForViolation('right-click on protected video');
+    }
+  });
+
+  protectedCourse.querySelectorAll('video').forEach((video) => {
+    video.setAttribute('controlsList', 'nodownload noplaybackrate noremoteplayback');
+    video.setAttribute('disablepictureinpicture', '');
+    video.setAttribute('playsinline', '');
+    video.addEventListener('contextmenu', (event) => event.preventDefault());
+  });
+
+  document.addEventListener('keydown', (event) => {
+    const key = String(event.key || '').toLowerCase();
+    const isProtectedShortcut =
+      key === 'f12' ||
+      key === 'printscreen' ||
+      ((event.ctrlKey || event.metaKey) && blockedCtrlKeys.has(key)) ||
+      ((event.ctrlKey || event.metaKey) && event.shiftKey && blockedDevKeys.has(key));
+
+    if (!isProtectedShortcut) return;
+    event.preventDefault();
+    event.stopPropagation();
+
+    if (key === 'printscreen' && navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
+      navigator.clipboard.writeText('').catch(() => {});
+    }
+
+    kickOutForViolation(`blocked shortcut: ${event.key || key}`);
+  }, true);
+
+  if (navigator.mediaDevices && typeof navigator.mediaDevices.getDisplayMedia === 'function') {
+    try {
+      navigator.mediaDevices.getDisplayMedia = () => {
+        kickOutForViolation('browser screen capture attempt');
+        return Promise.reject(new DOMException('Screen capture is disabled in protected courses.', 'NotAllowedError'));
+      };
+    } catch {}
+  }
+
+  function updateWatermarks() {
+    if (!watermarkNodes.length) return;
+    const timestamp = new Date().toLocaleString();
+    watermarkNodes.forEach((node) => {
+      const baseText = node.dataset.baseWatermark || node.textContent.trim();
+      node.dataset.baseWatermark = baseText;
+      node.textContent = `${baseText} | ${timestamp}`;
+    });
+  }
+
+  function moveWatermarks() {
+    watermarkNodes.forEach((node, index) => {
+      const top = 18 + Math.random() * 64;
+      const left = 18 + Math.random() * 64;
+      const rotation = index % 2 === 0
+        ? -8 + Math.random() * 16
+        : -22 + Math.random() * 44;
+
+      node.style.top = `${top}%`;
+      node.style.left = `${left}%`;
+      node.style.transform = `translate(-50%, -50%) rotate(${rotation.toFixed(1)}deg)`;
+    });
+  }
+
+  function pauseProtectedVideos() {
+    protectedCourse.querySelectorAll('video').forEach((video) => {
+      if (!video.paused) video.pause();
+    });
+  }
+
+  function setPlaybackShield(active) {
+    protectedPlayers.forEach((player) => {
+      player.classList.toggle('is-obscured', active);
+    });
+    if (active) pauseProtectedVideos();
+  }
+
+  document.addEventListener('visibilitychange', () => {
+    setPlaybackShield(document.hidden);
+  });
+
+  updateWatermarks();
+  moveWatermarks();
+  window.setInterval(updateWatermarks, 30000);
+  window.setInterval(moveWatermarks, 9000);
+})();
+
 (function initCourseCurriculumBuilder() {
   const expandButton = document.querySelector('[data-expand-curriculum]');
   if (!expandButton) return;
